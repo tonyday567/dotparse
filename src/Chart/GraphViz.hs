@@ -86,6 +86,8 @@ dotAttributes command _isDir gr asDot
     parseDG = (`asTypeOf` asDot) . fromGeneralised
 
 
+
+
 -- | Decompose an annotated, concretely laid-out graph into a map from vertex labels to
 --   points and a collection of edges associating vertex and edge
 --   labels to 'Path' values.
@@ -119,8 +121,6 @@ gpoint (G.Point {G.xCoord = x, G.yCoord = y}) = Point x y
 
 -- | get width from attribute list
 --
--- >>> g <- layoutGraph (defaultDiaParams :: GraphvizParams G.Node Int () () Int) Dot t1
--- >>> getWidth . fst . snd <$> G.labNodes g
 getWidth :: Attributes -> Maybe Double
 getWidth xs = case [w |(G.Width w) <- xs] of
   [] -> Nothing
@@ -156,7 +156,7 @@ example = do
 -- >>> gg <- layoutGraph (defaultDiaParams :: GraphvizParams G.Node Int () () Int) Dot t1
 -- >>> writeChartSvg "example.svg" (graphToChart gg)
 --
-graphToChart :: (Gr (AttributeNode Int) (AttributeEdge ())) -> ChartSvg
+graphToChart :: (Ord n, Show n) => (Gr (AttributeNode n) (AttributeEdge e)) -> ChartSvg
 graphToChart gr =
   mempty &
   #chartList .~ cs <> c0 <> [ts] &
