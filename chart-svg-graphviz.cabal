@@ -36,6 +36,7 @@ library
     fgl,
     graphviz >= 2999.20.1.0 && < 3000,
     lens,
+    lucid,
     numhask >= 0.7 && < 0.8,
     numhask-space >= 0.6 && < 0.7,
     text >= 1.2 && < 1.3,

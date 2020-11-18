@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedLabels #-}
 
 module Chart.NumHask where
@@ -13,6 +14,7 @@ import qualified Data.Text as Text
 import qualified Data.Map.Strict as Map
 import Control.Lens
 import qualified Data.List as List
+import Lucid
 
 data Class
   = Magma
@@ -51,11 +53,14 @@ data Class
   | BoundedJoinSemiLattice
   | BoundedMeetSemiLattice
   | BoundedLattice
-  -- Integrals
+  -- Number Types
   | Integral
+  | Ratio
   -- Measure
-  | Norm
   | Signed
+  | Norm
+  | Basis
+  | Direction
   | Epsilon
   deriving (Show, Eq, Ord)
 
@@ -105,8 +110,12 @@ clusters = Map.fromList
     (BoundedMeetSemiLattice,LatticeCluster),
     (BoundedLattice,LatticeCluster),
     (Norm,MeasureCluster),
+    (Basis,MeasureCluster),
+    (Direction,MeasureCluster),
     (Signed,MeasureCluster),
-    (Epsilon,MeasureCluster)
+    (Epsilon,MeasureCluster),
+    (Integral,NumHaskCluster),
+    (Ratio,NumHaskCluster)
   ]
 
 data Family
@@ -149,10 +158,6 @@ dependencies =
   , Dependency Distributive Additive (Just Addition)
   , Dependency Distributive Multiplicative (Just Multiplication)
   , Dependency Distributive Absorbing Nothing
-  , Dependency Semiring Additive (Just Addition)
-  , Dependency Semiring Distributive Nothing
-  , Dependency Semiring Associative (Just Multiplication)
-  , Dependency Semiring Unital (Just Multiplication)
   , Dependency Ring Distributive Nothing
   , Dependency Ring Subtractive (Just Addition)
   , Dependency IntegralDomain Ring Nothing
@@ -186,12 +191,14 @@ dependencies =
   , Dependency BoundedMeetSemiLattice Unital Nothing
   , Dependency BoundedLattice BoundedJoinSemiLattice Nothing
   , Dependency BoundedLattice BoundedMeetSemiLattice Nothing
-  , Dependency Signed Multiplicative Nothing
-  , Dependency Norm Additive Nothing
-  , Dependency Epsilon Additive Nothing
+  , Dependency Signed Ring Nothing
+  , Dependency Norm Ring Nothing
+  , Dependency Basis Ring Nothing
+  , Dependency Direction Ring Nothing
   , Dependency Epsilon Subtractive Nothing
   , Dependency Epsilon MeetSemiLattice Nothing
   , Dependency Integral Distributive Nothing
+  , Dependency Ratio Field Nothing
   ]
 
 fieldClasses :: [Class]
@@ -211,8 +218,8 @@ fieldClasses =
   , Field
   ]
 
-allClasses :: [Class]
-allClasses =
+classesNH :: [Class]
+classesNH =
   [ Additive
   , Subtractive
   , Multiplicative
@@ -223,31 +230,54 @@ allClasses =
   , ExpField
   , QuotientField
   , TrigField
-  , Norm
   , Signed
-  , Epsilon
+  , Norm
+  , Basis
+  , Direction
+  , MultiplicativeAction
+  , Module
+  , UpperBoundedField
+  , LowerBoundedField
+  , Integral
+  , Ratio
   ]
 
 toEdge :: Dependency -> (Class, Class, Maybe Family)
 toEdge (Dependency to' from' wrapper) = ((from'), (to'), wrapper)
 
-toNode :: Class -> Text
-toNode = show
-
-tAll :: G.Gr Class (Maybe Family)
-tAll = mkGraph (allClasses) (toEdge <$> dependencies)
+graphNH :: G.Gr Class (Maybe Family)
+graphNH = mkGraph (classesNH) (toEdge <$> dependencies)
 
 -- writeChartSvg "nh.svg" $ graphToChart g
-layout :: G.Gr Class (Maybe Family) -> IO (G.Gr (G.AttributeNode Class) (G.AttributeEdge (Maybe Family)))
-layout g =
+layout :: ConfigNH -> G.Gr Class (Maybe Family) -> IO (G.Gr (G.AttributeNode Class) (G.AttributeEdge (Maybe Family)))
+layout cfg g =
   layoutGraph
-  paramsNH
+  (paramsNH cfg)
   G.Dot
   g
 
+data ConfigNH =
+  ConfigNH
+  { nhWidth :: Double,
+    magic :: Double,
+    rheight :: Double,
+    rcolor :: Colour,
+    ecolor :: Colour,
+    esize :: Double,
+    tsize :: Double,
+    tnudge :: Double,
+    psize :: Double,
+    pheight :: Double,
+    pwidth :: Double,
+    pwpad :: Double
+  } deriving (Eq, Show, Generic)
+
+defaultConfigNH :: ConfigNH
+defaultConfigNH = ConfigNH 0.005 36.08 0.3 (setOpac 0.1 $ palette1 List.!! 0) (palette1 List.!! 1) 0.005 0.04 -2.0 1.0 0.25 0.06 0.3
+
 -- | Example parameters for GraphViz.
-paramsNH :: G.GraphvizParams G.Node Class (Maybe Family) Cluster Class
-paramsNH
+paramsNH :: ConfigNH -> G.GraphvizParams G.Node Class (Maybe Family) Cluster Class
+paramsNH cfg
   = G.defaultParams
     { G.globalAttributes =
       [ G.NodeAttrs
@@ -256,51 +286,24 @@ paramsNH
       , G.GraphAttrs
         [ G.Overlap G.KeepOverlaps,
           G.Splines G.SplineEdges,
-          G.Size (G.GSize 1 Nothing True)
+          G.Size (G.GSize (cfg ^. #psize) Nothing True)
         ]
       , G.EdgeAttrs [G.ArrowSize 0]
       ],
       G.isDirected = True,
       G.isDotCluster = const False,
-      G.fmtNode = \(_,l) -> [G.Height 0.25, G.Width (0.2 + 0.04 * fromIntegral $ Text.length $ show l)],
+      G.fmtNode = \(_,l) ->
+        [ G.Height (cfg ^. #pheight),
+          G.Width ((cfg ^. #pwpad) + (cfg ^. #pwidth) *
+                   (fromIntegral $ Text.length $ show l))],
       G.clusterBy = \(n,l) -> G.C (clusters Map.! l) (G.N (n,l))
     }
 
--- | convert the example graph to a chart
+-- | convert the numhask class graph to a chart
 --
--- >>> gg <- layoutGraph (defaultDiaParams :: GraphvizParams G.Node Int () () Int) Dot t1
--- >>> writeChartSvg "example.svg" (graphToChart gg)
 --
-nhChart :: (G.Gr (G.AttributeNode Class) (G.AttributeEdge e)) -> ChartSvg
-nhChart gr =
-  mempty &
-  #chartList .~ cs <> c0 <> [ts] &
-  #hudOptions .~ defaultHudOptions &
-  #svgOptions %~ ((#outerPad .~ Just 0.4) . (#chartAspect .~ UnadjustedAspect))
-  where
-    g = getGraph gr
-    bs = mconcat $ (\(_,_,_,ps) -> ps) <$> (snd g)
-    ns = Map.toList $ fst g
-    cs = infosToChart 1 (palette1 List.!! 0) . singletonInfo <$> bs
-    ws = getWidth . fst . snd <$> G.labNodes gr
-    c0 =
-      zipWith
-      (\w (Point x y) ->
-         Chart (RectA (defaultRectStyle & #borderSize .~ 1 & #color %~ setOpac 0.1))
-         [R (-magic*w + x) (magic*w + x) (-magic*h + y) (magic*h + y)])
-      (fromMaybe one <$> ws) (snd <$> ns)
-    ts = Chart (TextA (defaultTextStyle & #size .~ 12) (show . fst <$> ns)) (PointXY . (+Point 0 (-2)) . snd <$> ns)
-    magic = 36.08
-    h = 0.25
-
-
--- | convert the example graph to a chart
---
--- >>> gg <- layoutGraph (defaultDiaParams :: GraphvizParams G.Node Int () () Int) Dot t1
--- >>> writeChartSvg "example.svg" (graphToChart gg)
---
-nhChart' :: (G.Gr (G.AttributeNode Class) (G.AttributeEdge e)) -> ChartSvg
-nhChart' gr =
+chartNH :: ConfigNH -> (G.Gr (G.AttributeNode Class) (G.AttributeEdge e)) -> ChartSvg
+chartNH cfg gr =
   mempty &
   #chartList .~ cs <> c0 <> [ts] &
   #hudOptions .~ mempty &
@@ -309,19 +312,80 @@ nhChart' gr =
     g = getGraph gr
     bs = mconcat $ (\(_,_,_,ps) -> ps) <$> (snd g)
     ns = Map.toList $ fst g
-    cs = infosToChart 0.004 (palette1 List.!! 4) . singletonInfo <$> bs
+    cs = infosToChart (cfg ^. #nhWidth) (cfg ^. #ecolor) . singletonInfo <$> bs
     ws = getWidth . fst . snd <$> G.labNodes gr
     c0 =
       zipWith
       (\w (Point x y) ->
-         Chart (RectA (defaultRectStyle & #borderSize .~ 0.005 & #color %~ setOpac 0.1))
-         [R (-magic*w + x) (magic*w + x) (-magic*h + y) (magic*h + y)])
+         Chart (RectA (defaultRectStyle & #borderSize .~ (cfg ^. #esize) & #color .~ (cfg ^. #rcolor)))
+         [R (-m*w + x) (m*w + x) (-m*h + y) (m*h + y)])
       (fromMaybe one <$> ws) (snd <$> ns)
+    ts =
+      Chart (TextA (defaultTextStyle & #size .~ cfg ^. #tsize)
+             (show . fst <$> ns))
+      (PointXY . (+Point 0 (cfg ^. #tnudge)) . snd <$> ns)
+    m = cfg ^. #magic
+    h = cfg ^. #rheight
+
+-- | make the damn chart already!
+--
+-- >>> makeChartNH defaultConfigNH
+--
+-- ![chart](nh.svg)
+makeChartNH :: ConfigNH -> IO ()
+makeChartNH c = do
+  g <- layout c $ mkGraph (classesNH) (toEdge <$> dependencies)
+  writeChartSvg "nh.svg" $ chartNH c g
+
+-- | Add a tooltip and maybe a link
+--
+tooltip :: Chart Double -> Maybe Text -> TextStyle -> Text -> ChartExtra Double
+tooltip c l s t = ChartExtra c l [] (Lucid.title_ (attsText s) (Lucid.toHtml t))
+
+chartExtraNH :: (G.Gr (G.AttributeNode Class) (G.AttributeEdge e)) -> [(Text, Text)] -> [ChartExtra Double]
+chartExtraNH gr extras = rs' <> (toChartExtra <$> (cs <> [ts]))
+  where
+    g = getGraph gr
+    bs = mconcat $ (\(_,_,_,ps) -> ps) <$> (snd g)
+    ns = Map.toList $ fst g
+    cs = infosToChart 0.004 (palette1 List.!! 4) . singletonInfo <$> bs
+    ws = getWidth . fst . snd <$> G.labNodes gr
+    rs =
+      zipWith
+      (\w (Point x y) ->
+         Chart (RectA (defaultRectStyle & #borderSize .~ 0.005 & #color %~ setOpac 0.1))
+         [R (-m*w + x) (m*w + x) (-m*h + y) (m*h + y)])
+      (fromMaybe one <$> ws) (snd <$> ns)
+    rs' = zipWith (\c (l,t) -> tooltip c (Just l) defaultTextStyle t) rs extras
     ts = Chart (TextA (defaultTextStyle & #size .~ 0.03) (show . fst <$> ns)) (PointXY . (+Point 0 (-2)) . snd <$> ns)
-    magic = 36.08
+    m = 36.08
     h = 0.3
 
-nh' :: IO ()
-nh' = do
-  g <- layout $ mkGraph (allClasses) (toEdge <$> dependencies)
-  writeChartSvg "nh.svg" $ nhChart' g
+-- snd . snd <$> G.labNodes g
+-- [Additive,Subtractive,Multiplicative,Divisive,Distributive,Ring,Field,ExpField,QuotientField,TrigField,Norm,Signed,Epsilon]
+nodeExtras :: [(Text, Text)]
+nodeExtras =
+  [ ("NumHask-Algebra-Additive.html#t:Additive", "+, zero"),
+    ("NumHask-Algebra-Additive.html#t:Subtractive", "-, negate"),
+    ("NumHask-Algebra-Multiplicative.html#t:Multiplicative", "*, one"),
+    ("NumHask-Algebra-Multiplicative.html#t:Divisive", "/, recip"),
+    ("NumHask-Algebra-Ring.html#t:Distributive", ""),
+    ("NumHask-Algebra-Ring.html#t:Ring", ""),
+    ("NumHask-Algebra-Field.html#t:Field", ""),
+    ("NumHask-Algebra-Field.html#t:ExpField", "log, exp, sqrt"),
+    ("NumHask-Algebra-Field.html#t:QuotientField", "div, mod"),
+    ("NumHask-Algebra-Field.html#t:TrigField", "sin, cos, tan"),
+    ("NumHask-Analysis-Metric.html#t:Norm", "norm"),
+    ("NumHask-Analysis-Metric.html#t:Signed", "abs, sign"),
+    ("NumHask-Analysis-Metric.html#t:Epsilon", "epsilon")
+  ]
+
+makeChartExtraNH :: ConfigNH -> IO ()
+makeChartExtraNH c = do
+  g <- layout c $ mkGraph (classesNH) (toEdge <$> dependencies)
+  writeFile "nhextra.svg" $
+    renderChartExtrasWith
+    (defaultSvgOptions &
+     #outerPad .~ Just 0.02 &
+     #chartAspect .~ ChartAspect)
+    (chartExtraNH g nodeExtras)
