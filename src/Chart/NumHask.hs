@@ -67,6 +67,7 @@ data Class
 data Cluster
   = GroupCluster
   | LatticeCluster
+  | RingCluster
   | FieldCluster
   | HigherKindedCluster
   | MeasureCluster
@@ -92,7 +93,7 @@ clusters = Map.fromList
     (Semiring,NumHaskCluster),
     (Ring,NumHaskCluster),
     (IntegralDomain,NumHaskCluster),
-    (Field,FieldCluster),
+    (Field,NumHaskCluster),
     (ExpField,FieldCluster),
     (QuotientField,FieldCluster),
     (UpperBoundedField,FieldCluster),
@@ -100,22 +101,22 @@ clusters = Map.fromList
     (TrigField,FieldCluster),
     (AdditiveAction,HigherKindedCluster),
     (SubtractiveAction,HigherKindedCluster),
-    (MultiplicativeAction,HigherKindedCluster),
+    (MultiplicativeAction,NumHaskCluster),
     (DivisiveAction,HigherKindedCluster),
-    (Module,HigherKindedCluster),
+    (Module,NumHaskCluster),
     (JoinSemiLattice,LatticeCluster),
     (MeetSemiLattice,LatticeCluster),
     (Lattice,LatticeCluster),
     (BoundedJoinSemiLattice,LatticeCluster),
     (BoundedMeetSemiLattice,LatticeCluster),
     (BoundedLattice,LatticeCluster),
-    (Norm,MeasureCluster),
-    (Basis,MeasureCluster),
-    (Direction,MeasureCluster),
-    (Signed,MeasureCluster),
+    (Norm,RingCluster),
+    (Basis,RingCluster),
+    (Direction,RingCluster),
+    (Signed,RingCluster),
     (Epsilon,MeasureCluster),
-    (Integral,NumHaskCluster),
-    (Ratio,NumHaskCluster)
+    (Integral,RingCluster),
+    (Ratio,FieldCluster)
   ]
 
 data Family
@@ -197,12 +198,12 @@ dependencies =
   , Dependency Direction Ring Nothing
   , Dependency Epsilon Subtractive Nothing
   , Dependency Epsilon MeetSemiLattice Nothing
-  , Dependency Integral Distributive Nothing
+  , Dependency Integral Ring Nothing
   , Dependency Ratio Field Nothing
   ]
 
-fieldClasses :: [Class]
-fieldClasses =
+magmaClasses :: [Class]
+magmaClasses =
   [ Magma
   , Unital
   , Associative
@@ -284,19 +285,20 @@ paramsNH cfg
         [ G.Shape G.BoxShape
         ]
       , G.GraphAttrs
-        [ G.Overlap G.KeepOverlaps,
+        [ G.Overlap G.ScaleOverlaps,
           G.Splines G.SplineEdges,
           G.Size (G.GSize (cfg ^. #psize) Nothing True)
         ]
       , G.EdgeAttrs [G.ArrowSize 0]
       ],
-      G.isDirected = True,
-      G.isDotCluster = const False,
+      G.isDirected = False,
+      G.isDotCluster = const True,
+      G.clusterID = G.Str . show,
+      G.clusterBy = \(n,l) -> G.C (clusters Map.! l) (G.N (n, l)),
       G.fmtNode = \(_,l) ->
         [ G.Height (cfg ^. #pheight),
           G.Width ((cfg ^. #pwpad) + (cfg ^. #pwidth) *
-                   (fromIntegral $ Text.length $ show l))],
-      G.clusterBy = \(n,l) -> G.C (clusters Map.! l) (G.N (n,l))
+                   (fromIntegral $ Text.length $ show l))]
     }
 
 -- | convert the numhask class graph to a chart
@@ -336,6 +338,17 @@ makeChartNH :: ConfigNH -> IO ()
 makeChartNH c = do
   g <- layout c $ mkGraph (classesNH) (toEdge <$> dependencies)
   writeChartSvg "nh.svg" $ chartNH c g
+
+-- | magma chart
+--
+-- >>> makeChartMagma defaultConfigNH
+--
+-- ![chart](nhmagma.svg)
+makeChartMagma :: ConfigNH -> IO ()
+makeChartMagma c = do
+  g <- layout c $ mkGraph (magmaClasses) (toEdge <$> dependencies)
+  writeChartSvg "nhmagma.svg" $ chartNH c g & #chartList %~ (\x -> x <>
+    [Chart (LineA $ defaultLineStyle & #color .~ Colour 0.9 0.2 0.02 1 & #width .~ 0.005 & #dasharray .~ Just [0.03, 0.01] & #linecap .~ Just LineCapRound) (PointXY <$> [Point 50 230, Point 370 230])])
 
 -- | Add a tooltip and maybe a link
 --
