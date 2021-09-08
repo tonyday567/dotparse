@@ -1,0 +1,4 @@
+packages:
+  chart-svg-graphviz.cabal
+
+allow-newer: attoparsec

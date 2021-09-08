@@ -1,8 +1,4 @@
 cradle:
-  stack:
-    - path: "./app/chart-svg-graphviz.hs"
-      component: "chart-svg-graphviz:exe:chart-svg-graphviz"
+  cabal:
     - path: "./src"
-      component: "chart-svg-graphviz:lib"
-    - path: "./test/chart-svg-graphviz.hs"
-      component: "chart-svg-graphviz:test:chart-svg-graphviz"
+      component: "chart-svg-graphviz:lib:chart-svg-graphviz"
