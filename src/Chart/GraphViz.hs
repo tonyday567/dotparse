@@ -7,7 +7,6 @@
 module Chart.GraphViz where
 
 import Chart
-import Control.Lens
 import Data.Bifunctor
 import qualified Data.Foldable as F
 import qualified Data.Graph.Inductive.Graph as G
@@ -24,6 +23,7 @@ import Data.Text (Text, pack)
 import Data.Tuple
 import GHC.OverloadedLabels
 import NumHask.Prelude
+import Optics.Core
 
 -- | example graph
 example1 :: Gr Int ()
@@ -134,18 +134,16 @@ getWidth xs = case [w | (G.Width w) <- xs] of
   [] -> Nothing
   (x : _) -> Just x
 
-infosToChart :: Double -> Colour -> [(PathInfo Double, Point Double)] -> Chart Double
+infosToChart :: Double -> Colour -> [PathData Double] -> Chart
 infosToChart w c ps =
-  Chart
-    ( PathA
+    ( PathChart
         ( defaultPathStyle
             & #color .~ transparent
             & #borderColor .~ c
             & #borderSize .~ w
         )
-        (fst <$> ps)
     )
-    (PointXY . snd <$> ps)
+    ps
 
 -- | make example chart
 --
@@ -166,14 +164,13 @@ example = do
 graphToChart :: (Ord n, Show n) => Gr (AttributeNode n) (AttributeEdge e) -> ChartSvg
 graphToChart gr =
   mempty
-    & #chartList .~ cs <> c0 <> [ts]
-    & #hudOptions .~ mempty
-    & #svgOptions %~ ((#outerPad .~ Nothing) . (#chartAspect .~ UnadjustedAspect)) -- defaultHudOptions &
+    & #charts .~ unnamed (cs <> c0 <> [ts])
+    & #hudOptions .~ (mempty & #chartAspect .~ ChartAspect)
   where
     g = getGraph gr
     bs = mconcat $ (\(_, _, _, ps) -> ps) <$> snd g
     ns = (first (pack . show) <$> Map.toList (fst g)) :: [(Text, Point Double)]
     cs = infosToChart 1 (Colour 0.3 0.88 0.5 0.6) . singletonCubic <$> bs
     ws = getWidth . fst . snd <$> G.labNodes gr
-    c0 = zipWith (\w n -> Chart (GlyphA (defaultGlyphStyle & #shape .~ CircleGlyph & #size .~ w & #borderSize .~ 0)) [PointXY . snd $ n]) ((\x -> x / 0.5 * 36.08) . fromMaybe 0.5 <$> ws) ns
-    ts = Chart (TextA (defaultTextStyle & #size .~ 12) (fst <$> ns)) (PointXY . snd <$> ns)
+    c0 = zipWith (\w n -> GlyphChart (defaultGlyphStyle & #shape .~ CircleGlyph & #size .~ w & #borderSize .~ 0) [snd $ n]) ((\x -> x / 0.5 * 36.08) . fromMaybe 0.5 <$> ws) ns
+    ts = TextChart (defaultTextStyle & #size .~ 12) ns

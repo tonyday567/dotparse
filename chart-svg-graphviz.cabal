@@ -26,13 +26,13 @@ library
 
   build-depends:
     , base           >=4.7         && <5
-    , chart-svg      ^>=0.2.3
+    , chart-svg      ^>=0.3
     , containers     ^>=0.6
     , fgl            ^>=5.7
     , graphviz       >=2999.20.1.0 && <3000
-    , lens           ^>=5.0
     , numhask        ^>=0.8.1
     , numhask-space  ^>=0.8.1
+    , optics-core
     , text           ^>=1.2
 
   exposed-modules:

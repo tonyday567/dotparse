@@ -7,9 +7,8 @@ module Chart.NumHask where
 
 import Chart
 import Chart.GraphViz
-import Control.Lens
+import Optics.Core
 import qualified Data.Graph.Inductive as G
-import qualified Data.Graph.Inductive.Graph as G
 import qualified Data.GraphViz as G
 import qualified Data.GraphViz.Attributes.Complete as G
 import qualified Data.Map.Strict as Map
@@ -18,6 +17,7 @@ import qualified Data.Text as Text
 import Data.Text.Lazy (fromStrict)
 import GHC.OverloadedLabels
 import NumHask.Prelude
+import Data.Bifunctor
 
 data Class
   = Magma
@@ -278,7 +278,7 @@ data ConfigNH = ConfigNH
   deriving (Eq, Show, Generic)
 
 defaultConfigNH :: ConfigNH
-defaultConfigNH = ConfigNH 0.005 36.08 0.3 (setOpac 0.1 $ palette1 0) (palette1 1) 0.005 0.04 -2.0 1.0 0.25 0.06 0.3
+defaultConfigNH = ConfigNH 0.005 36.08 0.3 (set opac' 0.1 $ palette1 0) (palette1 1) 0.005 0.04 -2.0 1.0 0.25 0.06 0.3
 
 -- | Example parameters for GraphViz.
 paramsNH :: ConfigNH -> G.GraphvizParams G.Node Class (Maybe Family) Cluster Class
@@ -312,9 +312,8 @@ paramsNH cfg =
 chartNH :: ConfigNH -> G.Gr (G.AttributeNode Class) (G.AttributeEdge e) -> ChartSvg
 chartNH cfg gr =
   mempty
-    & #chartList .~ cs <> c0 <> [ts]
-    & #hudOptions .~ mempty
-    & #svgOptions %~ ((#outerPad ?~ 0.02) . (#chartAspect .~ ChartAspect))
+    & #charts .~ unnamed (cs <> c0 <> [ts])
+    & #hudOptions .~ (mempty & #frames %~ fmap (second (#buffer .~ 0.02)) & #chartAspect .~ ChartAspect)
   where
     g = getGraph gr
     bs = mconcat $ (\(_, _, _, ps) -> ps) <$> snd g
@@ -324,19 +323,14 @@ chartNH cfg gr =
     c0 =
       zipWith
         ( \w (Point x y) ->
-            Chart
-              (RectA (defaultRectStyle & #borderSize .~ (cfg ^. #esize) & #color .~ (cfg ^. #rcolor)))
-              [R (-m * w + x) (m * w + x) (-m * h + y) (m * h + y)]
+              RectChart (defaultRectStyle & #borderSize .~ (cfg ^. #esize) & #color .~ (cfg ^. #rcolor))
+              [Rect (-m * w + x) (m * w + x) (-m * h + y) (m * h + y)]
         )
         (fromMaybe one <$> ws)
         (snd <$> ns)
-    ts =
-      Chart
-        ( TextA
-            (defaultTextStyle & #size .~ cfg ^. #tsize)
-            (pack . show . fst <$> ns)
-        )
-        (PointXY . (+ Point 0 (cfg ^. #tnudge)) . snd <$> ns)
+    ts = TextChart
+         (defaultTextStyle & #size .~ cfg ^. #tsize)
+         (fmap (\(x,y) -> (pack . show $ x, y + Point 0 (cfg ^. #tnudge))) ns)
     m = cfg ^. #magic
     h = cfg ^. #rheight
 
@@ -359,8 +353,8 @@ makeChartMagma :: ConfigNH -> IO ()
 makeChartMagma c = do
   g <- layout c $ mkGraph magmaClasses (toEdge <$> dependencies)
   writeChartSvg "nhmagma.svg" $
-    chartNH c g & #chartList
+    chartNH c g & #charts
       %~ ( \x ->
              x
-               <> [Chart (LineA $ defaultLineStyle & #color .~ Colour 0.9 0.2 0.02 1 & #width .~ 0.005 & #dasharray ?~ [0.03, 0.01] & #linecap ?~ LineCapRound) (PointXY <$> [Point 50 230, Point 370 230])]
+               <> unnamed [LineChart (defaultLineStyle & #color .~ Colour 0.9 0.2 0.02 1 & #size .~ 0.005 & #dasharray ?~ [0.03, 0.01] & #linecap ?~ LineCapRound) [[Point 50 230, Point 370 230]]]
          )

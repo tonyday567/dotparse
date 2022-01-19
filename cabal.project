@@ -1,4 +1,9 @@
 packages:
   chart-svg-graphviz.cabal
+  ../chart-svg/chart-svg.cabal
+  ../formatn/formatn.cabal
 
-allow-newer: attoparsec
+source-repository-package
+  type: git
+  branch: main
+  location: https://github.com/tonyday567/numhask-space.git
