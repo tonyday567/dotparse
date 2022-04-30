@@ -40,6 +40,7 @@ import Data.List.NonEmpty
 -- >>> import FlatParse.Basic
 -- >>> import NeatInterpolation
 -- >>> import Data.Text.Encoding (encodeUtf8)
+-- >>> import Data.Proxy
 -- >>> :set -XOverloadedStrings
 
 -- | run a dotParse erroring on leftovers, Fail or Err
@@ -61,10 +62,10 @@ class DotParse a where
 
 -- | MergeEdges (strict)
 --
--- >>> trip MergeEdges
+-- >>> dtrip MergeEdges
 -- True
 --
--- >>> trip NoMergeEdges
+-- >>> dtrip NoMergeEdges
 -- True
 data MergeEdges = MergeEdges | NoMergeEdges deriving (Eq, Show, Generic)
 
@@ -112,12 +113,12 @@ instance DotParse Directed
 -- >>> parse_ "-.123" :: ID
 -- IDDouble (-0.123)
 --
--- >>> runParser idP "apple_1'"
+-- >>> runParser dotParse "apple_1'" :: Result () ID
 -- OK (IDString "apple_1") "'"
 --
 -- FIXME:
 -- >>> :set -XQuasiQuotes
--- >>> runParser idP $ encodeUtf8 [trimming|"quoted \""|]
+-- >>> runParser dotParse $ encodeUtf8 [trimming|"quoted \""|] :: Result () ID
 -- OK (IDQuoted "quoted \\") "\""
 --
 -- >>> parse_ (encodeUtf8 [trimming|<The <font color='red'><b>foo</b></font>,<br/> the <font point-size='20'>bar</font> and<br/> the <i>baz</i>>|]) :: ID
@@ -223,7 +224,7 @@ instance DotParse NodeID
 
 -- |
 -- >>> parse_ "shape=diamond; color=blue" :: AList
--- AList {aListID = IDStatement {firstID = IDString "shape", secondID = IDString "diamond"}, nextAList = Just (AList {aListID = IDStatement {firstID = IDString "color", secondID = IDString "blue"}, nextAList = Nothing})}
+-- AList {aList = IDStatement {firstID = IDString "shape", secondID = IDString "diamond"} :| [IDStatement {firstID = IDString "color", secondID = IDString "blue"}]}
 newtype AList = AList { aList :: NonEmpty IDStatement } deriving (Eq, Show, Generic)
 
 instance DotParse AList
@@ -237,7 +238,7 @@ instance DotParse AList
 
 -- |
 -- >>> parse_ "[shape=diamond; color=blue]" :: AttrList
---
+-- AttrList {attrList = [AList {aList = IDStatement {firstID = IDString "shape", secondID = IDString "diamond"} :| [IDStatement {firstID = IDString "color", secondID = IDString "blue"}]}]}
 newtype AttrList = AttrList { attrList :: [AList] } deriving (Eq, Show, Generic)
 
 instance DotParse AttrList
@@ -260,6 +261,7 @@ instance DotParse AttributeStatement
 
 -- |
 -- >>> parse_ "A [shape=diamond; color=blue]" :: Statement
+-- StatementNode (NodeStatement {nodeID = NodeID {nodeID' = IDString "A", nodePort = Just (Port {portID = Nothing, portCompass = Nothing})}, nodeAttributes = AttrList {attrList = [AList {aList = IDStatement {firstID = IDString "shape", secondID = IDString "diamond"} :| [IDStatement {firstID = IDString "color", secondID = IDString "blue"}]}]}})
 data NodeStatement = NodeStatement { nodeID :: NodeID, nodeAttributes :: AttrList } deriving (Eq, Show, Generic)
 
 instance DotParse NodeStatement
@@ -293,6 +295,7 @@ instance DotParse EdgeOp
 
 -- |
 -- >>> parse_ "-> B" :: EdgeRHS
+-- EdgeRHS {edgeOp = EdgeDirected, edgeID = EdgeID {unedgeID = Left (NodeID {nodeID' = IDString "B", nodePort = Just (Port {portID = Nothing, portCompass = Nothing})})}}
 data EdgeRHS = EdgeRHS { edgeOp :: EdgeOp, edgeID :: EdgeID } deriving (Eq, Show, Generic)
 
 instance DotParse EdgeRHS
@@ -304,6 +307,7 @@ instance DotParse EdgeRHS
 
 -- |
 -- >>> parse_ "-> B -> C" :: EdgeRHSs
+-- EdgeRHSs {edgeRHSs = EdgeRHS {edgeOp = EdgeDirected, edgeID = EdgeID {unedgeID = Left (NodeID {nodeID' = IDString "B", nodePort = Just (Port {portID = Nothing, portCompass = Nothing})})}} :| [EdgeRHS {edgeOp = EdgeDirected, edgeID = EdgeID {unedgeID = Left (NodeID {nodeID' = IDString "C", nodePort = Just (Port {portID = Nothing, portCompass = Nothing})})}}]}
 newtype EdgeRHSs = EdgeRHSs { edgeRHSs :: NonEmpty EdgeRHS } deriving (Eq, Show, Generic)
 
 instance DotParse EdgeRHSs
@@ -314,7 +318,8 @@ instance DotParse EdgeRHSs
       (\x0 x1 -> EdgeRHSs (x0:|x1)) <$> dotParse <*> many dotParse
 
 -- |
--- >>> parse_ "A -> B [style=dashed, color=grey]"
+-- >>> parse_ "A -> B [style=dashed, color=grey]" :: EdgeStatement
+-- EdgeStatement {edgeStatementID = EdgeID {unedgeID = Left (NodeID {nodeID' = IDString "A", nodePort = Just (Port {portID = Nothing, portCompass = Nothing})})}, edgeStatementRHS = EdgeRHSs {edgeRHSs = EdgeRHS {edgeOp = EdgeDirected, edgeID = EdgeID {unedgeID = Left (NodeID {nodeID' = IDString "B", nodePort = Just (Port {portID = Nothing, portCompass = Nothing})})}} :| []}, edgeStatementAttributes = AttrList {attrList = [AList {aList = IDStatement {firstID = IDString "style", secondID = IDString "dashed"} :| [IDStatement {firstID = IDString "color", secondID = IDString "grey"}]}]}}
 data EdgeStatement = EdgeStatement { edgeStatementID :: EdgeID, edgeStatementRHS :: EdgeRHSs, edgeStatementAttributes :: AttrList } deriving (Eq, Show, Generic)
 
 instance DotParse EdgeStatement
@@ -451,8 +456,8 @@ wrapCurlyPrint b = "{ " <> b <> " }"
 -- * examples
 
 -- | minimal definition
--- >>> runParser graphP ex0
--- OK (Graph {mergeEdges = Just NoMergeMultiEdges, directed = UnDirected, graphid = Nothing, statements = []}) ""
+-- >>> parse_ ex0 :: Graph
+-- Graph {mergeEdges = Just NoMergeEdges, directed = UnDirected, graphid = Nothing, statements = []}
 ex0 :: ByteString
 ex0 = encodeUtf8 [trimming|
 graph {
@@ -464,8 +469,8 @@ graph {
 -- FIXME:
 -- Fails on ex3 to 3x9, ex14, ex15
 --
--- >>> runParser graphP ex1
--- OK (Graph {mergeEdges = Just NoMergeMultiEdges, directed = Directed, graphid = Just (IDString "D"), statements = [StatementNode (NodeStatement {nodeID = NodeID {nodeID' = IDString "A", nodePort = Just (Port {portID = Nothing, portCompass = Nothing})}, nodeAttributes = AttrList {aList = Just (AList {aListID = IDStatement {firstID = IDString "shape", secondID = IDString "diamond"}, nextAList = Nothing}), attrList = Nothing}}),StatementNode (NodeStatement {nodeID = NodeID {nodeID' = IDString "B", nodePort = Just (Port {portID = Nothing, portCompass = Nothing})}, nodeAttributes = AttrList {aList = Just (AList {aListID = IDStatement {firstID = IDString "shape", secondID = IDString "box"}, nextAList = Nothing}), attrList = Nothing}}),StatementNode (NodeStatement {nodeID = NodeID {nodeID' = IDString "C", nodePort = Just (Port {portID = Nothing, portCompass = Nothing})}, nodeAttributes = AttrList {aList = Just (AList {aListID = IDStatement {firstID = IDString "shape", secondID = IDString "circle"}, nextAList = Nothing}), attrList = Nothing}}),StatementEdge (EdgeStatement {edgeStatementID = Left (NodeID {nodeID' = IDString "A", nodePort = Just (Port {portID = Nothing, portCompass = Nothing})}), edgeStatementRHS = EdgeRHS {edgeID = Left (NodeID {nodeID' = IDString "B", nodePort = Just (Port {portID = Nothing, portCompass = Nothing})}), edgeRHSs = []}, edgeStatementAttributes = AttrList {aList = Just (AList {aListID = IDStatement {firstID = IDString "style", secondID = IDString "dashed"}, nextAList = Just (AList {aListID = IDStatement {firstID = IDString "color", secondID = IDString "grey"}, nextAList = Nothing})}), attrList = Nothing}}),StatementEdge (EdgeStatement {edgeStatementID = Left (NodeID {nodeID' = IDString "A", nodePort = Just (Port {portID = Nothing, portCompass = Nothing})}), edgeStatementRHS = EdgeRHS {edgeID = Left (NodeID {nodeID' = IDString "C", nodePort = Just (Port {portID = Nothing, portCompass = Nothing})}), edgeRHSs = []}, edgeStatementAttributes = AttrList {aList = Just (AList {aListID = IDStatement {firstID = IDString "color", secondID = IDQuoted "black:invis:black"}, nextAList = Nothing}), attrList = Nothing}}),StatementEdge (EdgeStatement {edgeStatementID = Left (NodeID {nodeID' = IDString "A", nodePort = Just (Port {portID = Nothing, portCompass = Nothing})}), edgeStatementRHS = EdgeRHS {edgeID = Left (NodeID {nodeID' = IDString "D", nodePort = Just (Port {portID = Nothing, portCompass = Nothing})}), edgeRHSs = []}, edgeStatementAttributes = AttrList {aList = Just (AList {aListID = IDStatement {firstID = IDString "penwidth", secondID = IDInt 5}, nextAList = Just (AList {aListID = IDStatement {firstID = IDString "arrowhead", secondID = IDString "none"}, nextAList = Nothing})}), attrList = Nothing}})]}) ""
+-- > parse_ ex1 :: Graph
+--
 ex1 :: ByteString
 ex1 = encodeUtf8 [trimming|
 digraph D {
