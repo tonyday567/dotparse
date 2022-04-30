@@ -80,6 +80,16 @@ layoutGraph params com gr = dotAttributes com (isDirected params) gr' asDot
     params' = params {fmtEdge = setEdgeIDAttribute $ fmtEdge params}
     gr' = addEdgeIDs gr
 
+{-
+-- | Round-trip a DotGraph through an external graphviz layout algorithm, and read back in a version annotated with explicit positioning information.
+layoutDot ::
+  (Ord cl, G.Graph gr) =>
+  GraphvizCommand ->
+  DotGraph n ->
+  IO (gr (AttributeNode v) (AttributeEdge e))
+layoutDot layout gr = dotAttributes com (isDirected params) gr' asDot
+-}
+
 -- This should not be exported.  It is more or less copied from the
 -- graphviz package source; the problem is that graphviz does not
 -- export any way to have this parameterized by the GraphvizCommand.

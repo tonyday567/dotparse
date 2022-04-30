@@ -34,10 +34,16 @@ library
     , numhask-space  ^>=0.10
     , optics-core
     , text           ^>=1.2
+    , flatparse
+    , bytestring
+    , template-haskell
+    , neat-interpolation
 
   exposed-modules:
     Chart.GraphViz
     Chart.NumHask
+    Chart.Dot
+    Chart.Dot.TH
 
   other-modules:
   default-language:   Haskell2010
