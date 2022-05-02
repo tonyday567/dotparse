@@ -20,20 +20,23 @@
 
 module Chart.Dot where
 
--- import Data.Text (Text)
-import FlatParse.Basic
+import FlatParse.Basic hiding (cut, lines)
 import Chart.Dot.TH
 import Data.Char hiding (isDigit)
--- import Data.ByteString hiding (empty)
 import qualified Data.ByteString.Char8 as C
 import GHC.Generics
 import NeatInterpolation
 import Data.Text.Encoding (encodeUtf8)
-import Data.ByteString hiding (empty)
-import Data.Maybe
+import Data.ByteString hiding (zipWith, putStrLn, map, length, head, empty)
 import Data.Proxy
--- import Data.Text hiding (empty)
-import Data.List.NonEmpty
+import Data.List.NonEmpty hiding (zipWith, map, (!!), length, head)
+import Data.Bool
+import Data.These
+import Prelude hiding (replicate)
+import qualified Data.ByteString.Char8 as B
+import Control.Monad
+import Data.Algorithm.DiffOutput
+import Data.Algorithm.Diff
 
 -- $setup
 -- >>> import Chart.Dot
@@ -43,19 +46,45 @@ import Data.List.NonEmpty
 -- >>> import Data.Proxy
 -- >>> :set -XOverloadedStrings
 
+-- | Run parser, print pretty error on failure.
+testParser :: Show a => Parser Error a -> ByteString -> IO ()
+testParser p b =
+  case runParser p b of
+    Err e  -> B.putStrLn $ prettyError b e
+    OK a _ -> print a
+    Fail   -> B.putStrLn "uncaught parse error"
+
+-- | dotParse and then dotPrint:
+--
+-- - pretty printing error on failure.
+--
+-- - This is not an exact parser/printer, so the test re-parses the dotPrint, which should be idempotent
+testParserP :: forall a. (DotParse a) => Proxy a -> ByteString -> IO ()
+testParserP _ b =
+  case runParser dotParse b :: Result Error a of
+    Err e -> B.putStrLn $ prettyError b e
+    OK a left -> do
+      when (left /= "") (B.putStrLn $ "parsed with leftovers: " <> left)
+      case runParser dotParse (dotPrint a) :: Result Error a of
+        Err e -> B.putStrLn $ "round trip error: " <> prettyError (dotPrint a) e
+        Fail -> B.putStrLn "uncaught round trip parse error"
+        OK _ left -> do
+          when (left /= "") (B.putStrLn $ "round trip parse with left overs" <> left)
+    Fail -> B.putStrLn "uncaught parse error"
+
 -- | run a dotParse erroring on leftovers, Fail or Err
 parse_ :: (DotParse a) => ByteString -> a
 parse_ b = case runParser dotParse b of
   OK r "" -> r
   OK _ x -> error $ unpackUTF8 $ "leftovers: " <> x
   Fail -> error "Fail"
-  Err e -> error $ "Error: " <> e
+  Err e -> error $ unpackUTF8 $ prettyError b e
 
 -- * printing
 
 class DotParse a where
   dotPrint :: a -> ByteString
-  dotParse :: Parser e a
+  dotParse :: Parser Error a
 
 -- * Dot Grammar
 
@@ -80,7 +109,7 @@ dtrip :: (Eq a, DotParse a) => a -> Bool
 dtrip a = [(a,"")] == [(r,rem)|(OK r rem) <- [runParser dotParse (dotPrint a)]]
 
 btrip :: forall a. (DotParse a) => Proxy a -> ByteString -> Bool
-btrip _ b = [b] == (dotPrint <$> [r | (OK r "") <- [runParser dotParse b :: Result () a]])
+btrip _ b = [b] == (dotPrint <$> [r | (OK r "") <- [runParser dotParse b :: Result Error a]])
 
 -- | Directed (digraph | graph)
 -- >>> dtrip Directed
@@ -131,9 +160,7 @@ instance DotParse ID
     dotPrint (IDInt i) = packUTF8 (show i)
     dotPrint (IDDouble x) = packUTF8 (show x)
     dotPrint (IDQuoted x) =
-      (Data.ByteString.intercalate "\\\"" .
-       Data.ByteString.split (toEnum $ fromEnum '"') .
-       packUTF8) x
+      packUTF8 (show x)
     dotPrint (IDHtml s) = packUTF8 s
 
     dotParse =
@@ -151,12 +178,12 @@ data IDStatement = IDStatement { firstID :: ID, secondID :: ID } deriving (Eq, S
 
 instance DotParse IDStatement
   where
-    dotPrint (IDStatement x0 x1) = dotPrint x0 <> " = " <> dotPrint x1
+    dotPrint (IDStatement x0 x1) = dotPrint x0 <> "=" <> dotPrint x1
 
     dotParse = token $
       do
-        x0 <- dotParse
-        _ <- $(symbol "=")
+        x0 <- token dotParse
+        _ <- token $(symbol "=")
         x1 <- dotParse
         pure $ IDStatement x0 x1
 
@@ -206,19 +233,25 @@ instance DotParse Compass
                 |])
 
 
-data Port = Port { portID :: Maybe ID, portCompass :: Maybe Compass } deriving (Eq, Show, Generic)
+newtype Port = Port { portID :: These ID Compass } deriving (Eq, Show, Generic)
 
 instance DotParse Port
   where
-    dotPrint (Port x0 c) = intercalate " " $ catMaybes [(": " <>) . dotPrint <$> x0, (": " <>) . dotPrint <$> c]
+    dotPrint (Port (This i)) = ": " <> dotPrint i
+    dotPrint (Port (That c)) = ": " <> dotPrint c
+    dotPrint (Port (These i c)) = ": " <> dotPrint i <> " : " <> dotPrint c
 
-    dotParse = token $ Port <$> optional dotParse <*> optional dotParse
+    dotParse = token $
+      ((\x0 x1 -> Port (These x0 x1)) <$> ($(symbol ":") *> dotParse) <*> ($(symbol ":") *> dotParse)) <|>
+      (Port . This <$> ($(symbol ":") *> dotParse)) <|>
+      (Port . That <$> ($(symbol ":") *> dotParse))
 
+-- |
 data NodeID = NodeID { nodeID' :: ID, nodePort :: Maybe Port } deriving (Eq, Show, Generic)
 
 instance DotParse NodeID
   where
-    dotPrint (NodeID x0 p) = intercalate " " $ catMaybes [Just . dotPrint $ x0, dotPrint <$> p]
+    dotPrint (NodeID x0 p) = intercalate " " $ [dotPrint x0] <> maybe [] ((:[]) . dotPrint) p
 
     dotParse = token $ NodeID <$> dotParse <*> optional dotParse
 
@@ -244,7 +277,7 @@ newtype AttrList = AttrList { attrList :: [AList] } deriving (Eq, Show, Generic)
 instance DotParse AttrList
   where
     dotPrint (AttrList xs) = case xs of
-      [] -> "[]"
+      [] -> ""
       xs' -> intercalate " " $ wrapSquarePrint . dotPrint <$> xs'
 
     dotParse = token $
@@ -261,7 +294,7 @@ instance DotParse AttributeStatement
 
 -- |
 -- >>> parse_ "A [shape=diamond; color=blue]" :: Statement
--- StatementNode (NodeStatement {nodeID = NodeID {nodeID' = IDString "A", nodePort = Just (Port {portID = Nothing, portCompass = Nothing})}, nodeAttributes = AttrList {attrList = [AList {aList = IDStatement {firstID = IDString "shape", secondID = IDString "diamond"} :| [IDStatement {firstID = IDString "color", secondID = IDString "blue"}]}]}})
+-- StatementNode (NodeStatement {nodeID = NodeID {nodeID' = IDString "A", nodePort = Nothing}, nodeAttributes = AttrList {attrList = [AList {aList = IDStatement {firstID = IDString "shape", secondID = IDString "diamond"} :| [IDStatement {firstID = IDString "color", secondID = IDString "blue"}]}]}})
 data NodeStatement = NodeStatement { nodeID :: NodeID, nodeAttributes :: AttrList } deriving (Eq, Show, Generic)
 
 instance DotParse NodeStatement
@@ -275,7 +308,7 @@ newtype EdgeID = EdgeID { unedgeID :: Either NodeID SubGraphStatement} deriving 
 
 instance DotParse EdgeID
   where
-    dotPrint (EdgeID e) = either dotPrint undefined e
+    dotPrint (EdgeID e) = either dotPrint dotPrint e
 
     dotParse = EdgeID <$> (Left <$> dotParse) <|> (Right <$> dotParse)
 
@@ -290,12 +323,12 @@ instance DotParse EdgeOp
     dotParse = token
       $(switch [| case _ of
                    "->"  -> pure EdgeDirected
-                   "," -> pure EdgeUndirected
+                   "--" -> pure EdgeUndirected
                 |])
 
 -- |
 -- >>> parse_ "-> B" :: EdgeRHS
--- EdgeRHS {edgeOp = EdgeDirected, edgeID = EdgeID {unedgeID = Left (NodeID {nodeID' = IDString "B", nodePort = Just (Port {portID = Nothing, portCompass = Nothing})})}}
+-- EdgeRHS {edgeOp = EdgeDirected, edgeID = EdgeID {unedgeID = Left (NodeID {nodeID' = IDString "B", nodePort = Nothing})}}
 data EdgeRHS = EdgeRHS { edgeOp :: EdgeOp, edgeID :: EdgeID } deriving (Eq, Show, Generic)
 
 instance DotParse EdgeRHS
@@ -307,7 +340,7 @@ instance DotParse EdgeRHS
 
 -- |
 -- >>> parse_ "-> B -> C" :: EdgeRHSs
--- EdgeRHSs {edgeRHSs = EdgeRHS {edgeOp = EdgeDirected, edgeID = EdgeID {unedgeID = Left (NodeID {nodeID' = IDString "B", nodePort = Just (Port {portID = Nothing, portCompass = Nothing})})}} :| [EdgeRHS {edgeOp = EdgeDirected, edgeID = EdgeID {unedgeID = Left (NodeID {nodeID' = IDString "C", nodePort = Just (Port {portID = Nothing, portCompass = Nothing})})}}]}
+-- EdgeRHSs {edgeRHSs = EdgeRHS {edgeOp = EdgeDirected, edgeID = EdgeID {unedgeID = Left (NodeID {nodeID' = IDString "B", nodePort = Nothing})}} :| [EdgeRHS {edgeOp = EdgeDirected, edgeID = EdgeID {unedgeID = Left (NodeID {nodeID' = IDString "C", nodePort = Nothing})}}]}
 newtype EdgeRHSs = EdgeRHSs { edgeRHSs :: NonEmpty EdgeRHS } deriving (Eq, Show, Generic)
 
 instance DotParse EdgeRHSs
@@ -319,7 +352,7 @@ instance DotParse EdgeRHSs
 
 -- |
 -- >>> parse_ "A -> B [style=dashed, color=grey]" :: EdgeStatement
--- EdgeStatement {edgeStatementID = EdgeID {unedgeID = Left (NodeID {nodeID' = IDString "A", nodePort = Just (Port {portID = Nothing, portCompass = Nothing})})}, edgeStatementRHS = EdgeRHSs {edgeRHSs = EdgeRHS {edgeOp = EdgeDirected, edgeID = EdgeID {unedgeID = Left (NodeID {nodeID' = IDString "B", nodePort = Just (Port {portID = Nothing, portCompass = Nothing})})}} :| []}, edgeStatementAttributes = AttrList {attrList = [AList {aList = IDStatement {firstID = IDString "style", secondID = IDString "dashed"} :| [IDStatement {firstID = IDString "color", secondID = IDString "grey"}]}]}}
+-- EdgeStatement {edgeStatementID = EdgeID {unedgeID = Left (NodeID {nodeID' = IDString "A", nodePort = Nothing})}, edgeStatementRHS = EdgeRHSs {edgeRHSs = EdgeRHS {edgeOp = EdgeDirected, edgeID = EdgeID {unedgeID = Left (NodeID {nodeID' = IDString "B", nodePort = Nothing})}} :| []}, edgeStatementAttributes = AttrList {attrList = [AList {aList = IDStatement {firstID = IDString "style", secondID = IDString "dashed"} :| [IDStatement {firstID = IDString "color", secondID = IDString "grey"}]}]}}
 data EdgeStatement = EdgeStatement { edgeStatementID :: EdgeID, edgeStatementRHS :: EdgeRHSs, edgeStatementAttributes :: AttrList } deriving (Eq, Show, Generic)
 
 instance DotParse EdgeStatement
@@ -339,12 +372,13 @@ instance DotParse Statement
     dotPrint (StatementID x) = dotPrint x
     dotPrint (StatementSubGraph x) = dotPrint x
 
-    dotParse = token $
-      (StatementNode <$> dotParse) <|>
+    dotParse = token (
+      -- Order is important
       (StatementEdge <$> dotParse) <|>
-      (StatementAttribute <$> dotParse) <|>
       (StatementID <$> dotParse) <|>
-      (StatementSubGraph <$> dotParse)
+      (StatementNode <$> dotParse) <|>
+      (StatementAttribute <$> dotParse) <|>
+      (StatementSubGraph <$> dotParse))
 
 -- each subgraph must have a unique name
 data SubGraphStatement = SubGraphStatement { subgraphID :: Maybe ID, subgraphStatements :: [Statement] } deriving (Eq, Show, Generic)
@@ -355,38 +389,43 @@ instance DotParse SubGraphStatement
       intercalate " " $
       maybe []
       (\x' -> [intercalate " " ["subgraph", dotPrint x']]) x <>
-      (:[]) (intercalate "/n" $ dotPrint <$> xs)
+      (:[]) (wrapCurlyPrint (intercalate "\n    " $ dotPrint <$> xs))
 
     dotParse = token $ do
       x <- optional ($(keyword "subgraph") *> dotParse)
-      pure (SubGraphStatement x) <*> wrapCurlyP (many dotParse)
+      pure (SubGraphStatement x) <*> wrapCurlyP (many (optional sepP *> dotParse))
 
-data Graph = Graph { mergeEdges :: Maybe MergeEdges, directed :: Directed, graphid :: Maybe ID, statements :: [Statement]  } deriving (Eq, Show, Generic)
+data Graph = Graph { mergeEdges :: MergeEdges, directed :: Directed, graphid :: Maybe ID, statements :: [Statement]  } deriving (Eq, Show, Generic)
+
+
+outercalate :: ByteString -> [ByteString] -> ByteString
+outercalate _ [] = mempty
+outercalate a xs = a <> intercalate a xs <> a
 
 instance DotParse Graph
   where
     dotPrint (Graph me d x xs) =
-      intercalate " " $ maybe [] ((:[]) . dotPrint) me <> [dotPrint d] <> maybe [] ((:[]) . dotPrint) x <> [wrapCurlyPrint (intercalate "/n" (dotPrint <$> xs))]
+      intercalate " " $ bool [] ["strict"] (me == MergeEdges) <> [dotPrint d] <> maybe [] ((:[]) . dotPrint) x <> [wrapCurlyPrint (outercalate "\n    " (dotPrint <$> xs))]
 
     dotParse = token $
       Graph <$>
-      optional dotParse <*>
+      dotParse <*>
       dotParse <*>
       optional dotParse <*>
       wrapCurlyP (many dotParse)
 
 -- * parsing
-digit :: Parser e Int
+digit :: Parser Error Int
 digit = (\c -> ord c - ord '0') <$> satisfyASCII isDigit
 
-int :: Parser e Int
-int = token do
+int :: Parser Error Int
+int = (token do
   (place, n) <- chainr (\n (!place, !acc) -> (place*10,acc+place*n)) digit (pure (1, 0))
   case place of
     1 -> empty
-    _ -> pure n
+    _ -> pure n)
 
-digits :: Parser e (Int, Int)
+digits :: Parser Error (Int, Int)
 digits = chainr (\n (!place, !acc) -> (place*10,acc+place*n)) digit (pure (1, 0))
 
 -- |
@@ -404,8 +443,8 @@ digits = chainr (\n (!place, !acc) -> (place*10,acc+place*n)) digit (pure (1, 0)
 --
 -- >>> runParser double "123."
 -- OK 123.0 ""
-double :: Parser e Double
-double = token do
+double :: Parser Error Double
+double = (token do
   (placel, nl) <- digits
   optioned ($(char '.') *> digits)
     (\(placer, nr) ->
@@ -414,7 +453,7 @@ double = token do
          _ -> pure $ fromIntegral nl + fromIntegral nr / fromIntegral placer)
     (case placel of
       1 -> empty
-      _ -> pure $ fromIntegral nl)
+      _ -> pure $ fromIntegral nl))
 
 -- |
 -- >>> runParser (signed double) "-1.234x"
@@ -422,16 +461,16 @@ double = token do
 signed :: Num b => Parser e b -> Parser e b
 signed p = optioned $(char '-') (const (((-1) *) <$> p)) p
 
-quoted :: Parser e String
+quoted :: Parser Error String
 quoted =
-  $(char '"') *> many unquoteQuote <* $(char '"')
+  $(symbol "\"") *> many unquoteQuote <* $(symbol' "\"")
 
-unquoteQuote :: Parser e Char
-unquoteQuote = do
+unquoteQuote :: Parser Error Char
+unquoteQuote = (do
   next <- satisfy (/= '"')
   case next of
     '/' -> branch (lookahead $(char '"')) ('"' <$ $(char '"')) (pure '/')
-    x -> pure x
+    x -> pure x)
 
 sepP :: Parser e ()
 sepP = token
@@ -440,52 +479,59 @@ sepP = token
     "," -> pure ()
             |])
 
-wrapSquareP :: Parser e a -> Parser e a
+wrapSquareP :: Parser Error a -> Parser Error a
 wrapSquareP p =
-  $(symbol "[") *> p <* $(symbol "]")
+  $(symbol "[") *> p <* $(symbol' "]")
 
 wrapSquarePrint :: ByteString -> ByteString
-wrapSquarePrint b = "[ " <> b <> " ]"
+wrapSquarePrint b = "[" <> b <> "]"
 
-wrapCurlyP :: Parser e a -> Parser e a
-wrapCurlyP p = $(symbol "{") *> p <* $(symbol "}")
+wrapQuotePrint :: ByteString -> ByteString
+wrapQuotePrint b = "\"" <> b <> "\""
+
+
+wrapCurlyP :: Parser Error a -> Parser Error a
+wrapCurlyP p = $(symbol "{") *> p <* $(symbol' "}")
 
 wrapCurlyPrint :: ByteString -> ByteString
-wrapCurlyPrint b = "{ " <> b <> " }"
+wrapCurlyPrint b = "{" <> b <> "}"
 
 -- * examples
 
 -- | minimal definition
 -- >>> parse_ ex0 :: Graph
--- Graph {mergeEdges = Just NoMergeEdges, directed = UnDirected, graphid = Nothing, statements = []}
+-- Graph {mergeEdges = NoMergeEdges, directed = UnDirected, graphid = Nothing, statements = []}
+--
+-- >>> testParserP (Proxy :: Proxy Graph) ex0
+--
 ex0 :: ByteString
 ex0 = encodeUtf8 [trimming|
-graph {
-}
+graph {}
 |]
 
 -- | Examples from https://renenyffenegger.ch/notes/tools/Graphviz/examples/index
 --
--- FIXME:
--- Fails on ex3 to 3x9, ex14, ex15
---
--- > parse_ ex1 :: Graph
+-- >>> testParserP (Proxy :: Proxy Graph) ex1
 --
 ex1 :: ByteString
 ex1 = encodeUtf8 [trimming|
 digraph D {
-
-  A [shape=diamond]
-  B [shape=box]
-  C [shape=circle]
-
-  A -> B [style=dashed, color=grey]
-  A -> C [color="black:invis:black"]
-  A -> D [penwidth=5, arrowhead=none]
-
-}
+    A [shape=diamond]
+    B [shape=box]
+    C [shape=circle]
+    A -> B [style=dashed, color=grey]
+    A -> C [color="black:invis:black"]
+    A -> D [penwidth=5, arrowhead=none]
+    }
 |]
 
+-- |
+--
+ex1' :: Graph
+ex1' = Graph {mergeEdges = NoMergeEdges, directed = Directed, graphid = Just (IDString "D"), statements = [StatementNode (NodeStatement {nodeID = NodeID {nodeID' = IDString "A", nodePort = Nothing}, nodeAttributes = AttrList {attrList = [AList {aList = IDStatement {firstID = IDString "shape", secondID = IDString "diamond"} :| []}]}}),StatementNode (NodeStatement {nodeID = NodeID {nodeID' = IDString "B", nodePort = Nothing}, nodeAttributes = AttrList {attrList = [AList {aList = IDStatement {firstID = IDString "shape", secondID = IDString "box"} :| []}]}}),StatementNode (NodeStatement {nodeID = NodeID {nodeID' = IDString "C", nodePort = Nothing}, nodeAttributes = AttrList {attrList = [AList {aList = IDStatement {firstID = IDString "shape", secondID = IDString "circle"} :| []}]}}),StatementEdge (EdgeStatement {edgeStatementID = EdgeID {unedgeID = Left (NodeID {nodeID' = IDString "A", nodePort = Nothing})}, edgeStatementRHS = EdgeRHSs {edgeRHSs = EdgeRHS {edgeOp = EdgeDirected, edgeID = EdgeID {unedgeID = Left (NodeID {nodeID' = IDString "B", nodePort = Nothing})}} :| []}, edgeStatementAttributes = AttrList {attrList = [AList {aList = IDStatement {firstID = IDString "style", secondID = IDString "dashed"} :| [IDStatement {firstID = IDString "color", secondID = IDString "grey"}]}]}}),StatementEdge (EdgeStatement {edgeStatementID = EdgeID {unedgeID = Left (NodeID {nodeID' = IDString "A", nodePort = Nothing})}, edgeStatementRHS = EdgeRHSs {edgeRHSs = EdgeRHS {edgeOp = EdgeDirected, edgeID = EdgeID {unedgeID = Left (NodeID {nodeID' = IDString "C", nodePort = Nothing})}} :| []}, edgeStatementAttributes = AttrList {attrList = [AList {aList = IDStatement {firstID = IDString "color", secondID = IDQuoted "black:invis:black"} :| []}]}}),StatementEdge (EdgeStatement {edgeStatementID = EdgeID {unedgeID = Left (NodeID {nodeID' = IDString "A", nodePort = Nothing})}, edgeStatementRHS = EdgeRHSs {edgeRHSs = EdgeRHS {edgeOp = EdgeDirected, edgeID = EdgeID {unedgeID = Left (NodeID {nodeID' = IDString "D", nodePort = Nothing})}} :| []}, edgeStatementAttributes = AttrList {attrList = [AList {aList = IDStatement {firstID = IDString "penwidth", secondID = IDInt 5} :| [IDStatement {firstID = IDString "arrowhead", secondID = IDString "none"}]}]}})]}
+
+-- |
+-- >>> testParserP (Proxy :: Proxy Graph) ex2
 ex2 :: ByteString
 ex2 = encodeUtf8 [trimming|
 digraph D {
@@ -498,7 +544,9 @@ digraph D {
 }
 |]
 
-
+-- FIXME:
+-- |
+-- >>> testParserP (Proxy :: Proxy Graph) ex3
 ex3 :: ByteString
 ex3 = encodeUtf8 [trimming|
 digraph D {
@@ -821,3 +869,10 @@ digraph D {
 
 }
 |]
+
+testAll :: IO ()
+testAll = sequence_ $ zipWith (>>)
+  (putStrLn <$> ["ex0","ex1","ex2","ex3","ex4","ex5","ex6","ex7"
+                ,"ex8","ex9","ex10","ex11","ex12","ex13","ex14","ex15"])
+  (testParserP (Proxy :: Proxy Graph) <$>
+  [ex0,ex1,ex2,ex3,ex4,ex5,ex6,ex7,ex8,ex9,ex10,ex11,ex12,ex13,ex14,ex15])

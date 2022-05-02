@@ -38,6 +38,8 @@ library
     , bytestring
     , template-haskell
     , neat-interpolation
+    , these
+    , Diff
 
   exposed-modules:
     Chart.GraphViz
