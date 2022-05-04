@@ -10,7 +10,7 @@
 -- | Abstract Grammar from:
 -- http://www.graphviz.org/doc/info/lang.html
 
-module Chart.Dot.TH where
+module Dot.TH where
 
 import Language.Haskell.TH
 import FlatParse.Basic
@@ -41,9 +41,13 @@ isKeyword span' = inSpan span' do
   eof
 
 -- | Consume whitespace.
+
 ws :: Parser e ()
 ws = $(switch [| case _ of
+  -- order matters
   " "  -> ws
+  "\\\n" -> ws
+  "\\\\\\n" -> ws
   "\n" -> ws
   "\t" -> ws
   "\r" -> ws

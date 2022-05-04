@@ -24,6 +24,8 @@ import Data.Tuple
 import GHC.OverloadedLabels
 import NumHask.Prelude
 import Optics.Core
+import Algebra.Graph
+
 
 -- | example graph
 example1 :: Gr Int ()
@@ -34,6 +36,13 @@ example1 =
         ++ [(v, v + k, ()) | v <- [0 .. 5], k <- [6, 12]]
         ++ [(2, 18, ()), (2, 19, ()), (15, 18, ()), (15, 19, ()), (18, 3, ()), (19, 3, ())]
     )
+
+example1' :: Graph Int
+example1' = edges $
+    [(v, (v + 1) `mod` 6) | v <- [0 .. 5]]
+        ++ [(v, v + k) | v <- [0 .. 5], k <- [6, 12]]
+        ++ [(2, 18), (2, 19), (15, 18), (15, 19), (18, 3), (19, 3)]
+
 
 -- | Construct a graph from a list of vertex labels (which must be unique) and
 --   a list of (directed) edges.  The result is suitable as input to 'layoutGraph'.
@@ -79,6 +88,14 @@ layoutGraph params com gr = dotAttributes com (isDirected params) gr' asDot
     asDot = graphToDot params' gr'
     params' = params {fmtEdge = setEdgeIDAttribute $ fmtEdge params}
     gr' = addEdgeIDs gr
+
+-- putStrLn $ L.unpack $ printDotGraph d1
+
+-- d1 :: DotGraph G.Node
+--d1 =
+--  graphToDot
+--  (defaultParamsChart {fmtEdge = setEdgeIDAttribute $ fmtEdge defaultParamsChart})
+--  (addEdgeIDs example1)
 
 {-
 -- | Round-trip a DotGraph through an external graphviz layout algorithm, and read back in a version annotated with explicit positioning information.

@@ -14,29 +14,48 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TupleSections #-}
+{-# HLINT ignore "Use lambda-case" #-}
+{-# HLINT ignore "Use ?~" #-}
 
 -- | Abstract Grammar from:
 -- http://www.graphviz.org/doc/info/lang.html
 
-module Chart.Dot where
+module Dot where
 
 import FlatParse.Basic hiding (cut, lines)
-import Chart.Dot.TH
+import Dot.TH hiding (merge)
 import Data.Char hiding (isDigit)
 import qualified Data.ByteString.Char8 as C
 import GHC.Generics
 import NeatInterpolation
 import Data.Text.Encoding (encodeUtf8)
-import Data.ByteString hiding (zipWith, putStrLn, map, length, head, empty)
+import Data.ByteString hiding (zip, zipWith, putStrLn, map, length, head, empty)
 import Data.Proxy
-import Data.List.NonEmpty hiding (zipWith, map, (!!), length, head)
+import Data.List.NonEmpty hiding (zip, zipWith, map, (!!), length, head)
 import Data.Bool
 import Data.These
 import Prelude hiding (replicate)
 import qualified Data.ByteString.Char8 as B
 import Control.Monad
-import Data.Algorithm.DiffOutput
-import Data.Algorithm.Diff
+import System.Process.ByteString
+import System.Exit
+import qualified Algebra.Graph as G
+import NumHask.Space
+import qualified Data.Map.Strict as Map
+import Optics.Core
+import GHC.IO.Unsafe
+import Data.Text (Text)
+import Chart
+import Data.Maybe
+import Data.Map.Merge.Strict
+import qualified Data.Text as Text
+import qualified Algebra.Graph.Labelled as L
+import Data.Monoid
+import Data.Bifunctor
+-- import Data.Algorithm.DiffOutput
+-- import Data.Algorithm.Diff
 
 -- $setup
 -- >>> import Chart.Dot
@@ -73,15 +92,22 @@ testParserP _ b =
     Fail -> B.putStrLn "uncaught parse error"
 
 -- | run a dotParse erroring on leftovers, Fail or Err
-parse_ :: (DotParse a) => ByteString -> a
-parse_ b = case runParser dotParse b of
+runDotParser :: (DotParse a) => ByteString -> a
+runDotParser b = case runParser dotParse b of
+  OK r "" -> r
+  OK _ x -> error $ unpackUTF8 $ "leftovers: " <> x
+  Fail -> error "Fail"
+  Err e -> error $ unpackUTF8 $ prettyError b e
+
+-- | run a Parser, erroring on leftovers, Fail or Err
+runParser_ :: Parser Error a -> ByteString -> a
+runParser_ p b = case runParser p b of
   OK r "" -> r
   OK _ x -> error $ unpackUTF8 $ "leftovers: " <> x
   Fail -> error "Fail"
   Err e -> error $ unpackUTF8 $ prettyError b e
 
 -- * printing
-
 class DotParse a where
   dotPrint :: a -> ByteString
   dotParse :: Parser Error a
@@ -136,10 +162,10 @@ instance DotParse Directed
 
 -- |
 --
--- >>> parse_ "0" :: ID
+-- >>> runDotParser "0" :: ID
 -- IDInt 0
 --
--- >>> parse_ "-.123" :: ID
+-- >>> runDotParser "-.123" :: ID
 -- IDDouble (-0.123)
 --
 -- >>> runParser dotParse "apple_1'" :: Result () ID
@@ -150,9 +176,9 @@ instance DotParse Directed
 -- >>> runParser dotParse $ encodeUtf8 [trimming|"quoted \""|] :: Result () ID
 -- OK (IDQuoted "quoted \\") "\""
 --
--- >>> parse_ (encodeUtf8 [trimming|<The <font color='red'><b>foo</b></font>,<br/> the <font point-size='20'>bar</font> and<br/> the <i>baz</i>>|]) :: ID
+-- >>> runDotParser (encodeUtf8 [trimming|<The <font color='red'><b>foo</b></font>,<br/> the <font point-size='20'>bar</font> and<br/> the <i>baz</i>>|]) :: ID
 -- IDHtml "<The <font color='red'><b>foo</b></font>,<br/> the <font point-size='20'>bar</font> and<br/> the <i>baz</i>>"
-data ID = IDString String | IDInt Int | IDDouble Double | IDQuoted String | IDHtml String deriving (Eq, Show, Generic)
+data ID = IDString String | IDInt Int | IDDouble Double | IDQuoted String | IDHtml String deriving (Eq, Show, Generic, Ord)
 
 instance DotParse ID
   where
@@ -163,16 +189,24 @@ instance DotParse ID
       packUTF8 (show x)
     dotPrint (IDHtml s) = packUTF8 s
 
+    -- order matters
     dotParse =
       (IDString . C.unpack <$> ident) <|>
-      (IDInt <$> signed int) <|>
+      (IDInt <$> (signed int `notFollowedBy` $(char '.'))) <|>
       (IDDouble <$> signed double) <|>
       (IDQuoted <$> quoted) <|>
       (IDHtml <$> htmlLike)
 
+label :: ID -> String
+label (IDString s) = s
+label (IDInt i) = show i
+label (IDDouble d) = show d
+label (IDQuoted q) = q
+label (IDHtml h) = h
+
 -- | Attribute tuple
 --
--- >>> parse_ "shape=diamond" :: IDStatement
+-- >>> runDotParser "shape=diamond" :: IDStatement
 -- IDStatement {firstID = IDString "shape", secondID = IDString "diamond"}
 data IDStatement = IDStatement { firstID :: ID, secondID :: ID } deriving (Eq, Show, Generic)
 
@@ -256,7 +290,7 @@ instance DotParse NodeID
     dotParse = token $ NodeID <$> dotParse <*> optional dotParse
 
 -- |
--- >>> parse_ "shape=diamond; color=blue" :: AList
+-- >>> runDotParser "shape=diamond; color=blue" :: AList
 -- AList {aList = IDStatement {firstID = IDString "shape", secondID = IDString "diamond"} :| [IDStatement {firstID = IDString "color", secondID = IDString "blue"}]}
 newtype AList = AList { aList :: NonEmpty IDStatement } deriving (Eq, Show, Generic)
 
@@ -270,7 +304,7 @@ instance DotParse AList
       pure $ AList (s :| xs)
 
 -- |
--- >>> parse_ "[shape=diamond; color=blue]" :: AttrList
+-- >>> runDotParser "[shape=diamond; color=blue]" :: AttrList
 -- AttrList {attrList = [AList {aList = IDStatement {firstID = IDString "shape", secondID = IDString "diamond"} :| [IDStatement {firstID = IDString "color", secondID = IDString "blue"}]}]}
 newtype AttrList = AttrList { attrList :: [AList] } deriving (Eq, Show, Generic)
 
@@ -293,7 +327,7 @@ instance DotParse AttributeStatement
     dotParse = AttributeStatement <$> dotParse <*> dotParse
 
 -- |
--- >>> parse_ "A [shape=diamond; color=blue]" :: Statement
+-- >>> runDotParser "A [shape=diamond; color=blue]" :: Statement
 -- StatementNode (NodeStatement {nodeID = NodeID {nodeID' = IDString "A", nodePort = Nothing}, nodeAttributes = AttrList {attrList = [AList {aList = IDStatement {firstID = IDString "shape", secondID = IDString "diamond"} :| [IDStatement {firstID = IDString "color", secondID = IDString "blue"}]}]}})
 data NodeStatement = NodeStatement { nodeID :: NodeID, nodeAttributes :: AttrList } deriving (Eq, Show, Generic)
 
@@ -327,7 +361,7 @@ instance DotParse EdgeOp
                 |])
 
 -- |
--- >>> parse_ "-> B" :: EdgeRHS
+-- >>> runDotParser "-> B" :: EdgeRHS
 -- EdgeRHS {edgeOp = EdgeDirected, edgeID = EdgeID {unedgeID = Left (NodeID {nodeID' = IDString "B", nodePort = Nothing})}}
 data EdgeRHS = EdgeRHS { edgeOp :: EdgeOp, edgeID :: EdgeID } deriving (Eq, Show, Generic)
 
@@ -339,7 +373,7 @@ instance DotParse EdgeRHS
       EdgeRHS <$> dotParse <*> dotParse
 
 -- |
--- >>> parse_ "-> B -> C" :: EdgeRHSs
+-- >>> runDotParser "-> B -> C" :: EdgeRHSs
 -- EdgeRHSs {edgeRHSs = EdgeRHS {edgeOp = EdgeDirected, edgeID = EdgeID {unedgeID = Left (NodeID {nodeID' = IDString "B", nodePort = Nothing})}} :| [EdgeRHS {edgeOp = EdgeDirected, edgeID = EdgeID {unedgeID = Left (NodeID {nodeID' = IDString "C", nodePort = Nothing})}}]}
 newtype EdgeRHSs = EdgeRHSs { edgeRHSs :: NonEmpty EdgeRHS } deriving (Eq, Show, Generic)
 
@@ -351,7 +385,7 @@ instance DotParse EdgeRHSs
       (\x0 x1 -> EdgeRHSs (x0:|x1)) <$> dotParse <*> many dotParse
 
 -- |
--- >>> parse_ "A -> B [style=dashed, color=grey]" :: EdgeStatement
+-- >>> runDotParser "A -> B [style=dashed, color=grey]" :: EdgeStatement
 -- EdgeStatement {edgeStatementID = EdgeID {unedgeID = Left (NodeID {nodeID' = IDString "A", nodePort = Nothing})}, edgeStatementRHS = EdgeRHSs {edgeRHSs = EdgeRHS {edgeOp = EdgeDirected, edgeID = EdgeID {unedgeID = Left (NodeID {nodeID' = IDString "B", nodePort = Nothing})}} :| []}, edgeStatementAttributes = AttrList {attrList = [AList {aList = IDStatement {firstID = IDString "style", secondID = IDString "dashed"} :| [IDStatement {firstID = IDString "color", secondID = IDString "grey"}]}]}}
 data EdgeStatement = EdgeStatement { edgeStatementID :: EdgeID, edgeStatementRHS :: EdgeRHSs, edgeStatementAttributes :: AttrList } deriving (Eq, Show, Generic)
 
@@ -376,8 +410,8 @@ instance DotParse Statement
       -- Order is important
       (StatementEdge <$> dotParse) <|>
       (StatementID <$> dotParse) <|>
-      (StatementNode <$> dotParse) <|>
       (StatementAttribute <$> dotParse) <|>
+      (StatementNode <$> dotParse) <|>
       (StatementSubGraph <$> dotParse))
 
 -- each subgraph must have a unique name
@@ -419,11 +453,11 @@ digit :: Parser Error Int
 digit = (\c -> ord c - ord '0') <$> satisfyASCII isDigit
 
 int :: Parser Error Int
-int = (token do
+int = token do
   (place, n) <- chainr (\n (!place, !acc) -> (place*10,acc+place*n)) digit (pure (1, 0))
   case place of
     1 -> empty
-    _ -> pure n)
+    _ -> pure n
 
 digits :: Parser Error (Int, Int)
 digits = chainr (\n (!place, !acc) -> (place*10,acc+place*n)) digit (pure (1, 0))
@@ -444,7 +478,7 @@ digits = chainr (\n (!place, !acc) -> (place*10,acc+place*n)) digit (pure (1, 0)
 -- >>> runParser double "123."
 -- OK 123.0 ""
 double :: Parser Error Double
-double = (token do
+double = token do
   (placel, nl) <- digits
   optioned ($(char '.') *> digits)
     (\(placer, nr) ->
@@ -453,7 +487,7 @@ double = (token do
          _ -> pure $ fromIntegral nl + fromIntegral nr / fromIntegral placer)
     (case placel of
       1 -> empty
-      _ -> pure $ fromIntegral nl))
+      _ -> pure $ fromIntegral nl)
 
 -- |
 -- >>> runParser (signed double) "-1.234x"
@@ -466,11 +500,11 @@ quoted =
   $(symbol "\"") *> many unquoteQuote <* $(symbol' "\"")
 
 unquoteQuote :: Parser Error Char
-unquoteQuote = (do
+unquoteQuote = do
   next <- satisfy (/= '"')
   case next of
     '/' -> branch (lookahead $(char '"')) ('"' <$ $(char '"')) (pure '/')
-    x -> pure x)
+    x -> pure x
 
 sepP :: Parser e ()
 sepP = token
@@ -496,10 +530,33 @@ wrapCurlyP p = $(symbol "{") *> p <* $(symbol' "}")
 wrapCurlyPrint :: ByteString -> ByteString
 wrapCurlyPrint b = "{" <> b <> "}"
 
+pointP :: Parser Error (Point Double)
+pointP = token $ Point <$> double <*> ($(symbol ",") *> double)
+
+curveP :: Parser Error [Point Double]
+curveP = $(symbol "e,") *> many pointP
+
+rectP :: Parser Error (Rect Double)
+rectP = token $ do
+  x <- double
+  _ <- $(symbol ",")
+  y <- double
+  _ <- $(symbol ",")
+  z <- double
+  _ <- $(symbol ",")
+  w <- double
+  pure $ Rect x z y w
+
+boolP :: Parser Error Bool
+boolP =
+  (True <$ $(symbol "true")) <|>
+  (False <$ $(symbol "false"))
+
+
 -- * examples
 
 -- | minimal definition
--- >>> parse_ ex0 :: Graph
+-- >>> runDotParser ex0 :: Graph
 -- Graph {mergeEdges = NoMergeEdges, directed = UnDirected, graphid = Nothing, statements = []}
 --
 -- >>> testParserP (Proxy :: Proxy Graph) ex0
@@ -871,8 +928,557 @@ digraph D {
 |]
 
 testAll :: IO ()
-testAll = sequence_ $ zipWith (>>)
+testAll = zipWithM_ (>>)
   (putStrLn <$> ["ex0","ex1","ex2","ex3","ex4","ex5","ex6","ex7"
                 ,"ex8","ex9","ex10","ex11","ex12","ex13","ex14","ex15"])
   (testParserP (Proxy :: Proxy Graph) <$>
   [ex0,ex1,ex2,ex3,ex4,ex5,ex6,ex7,ex8,ex9,ex10,ex11,ex12,ex13,ex14,ex15])
+
+
+defaultBS :: ByteString
+defaultBS = encodeUtf8 [trimming|
+digraph {
+    node [shape=circle
+         ,height=0.5];
+    graph [overlap=false
+          ,splines=spline
+          ,size="1!"];
+    edge [arrowsize=0];
+  }
+|]
+
+defaultGraph :: Graph
+defaultGraph = runDotParser defaultBS
+
+-- | -Tdot for DotOutput
+dotB :: Directed -> ByteString -> IO ByteString
+dotB d i = do
+  let cmd = case d of
+        Directed -> "dot"
+        UnDirected -> "neato"
+  let args' = ["-Tdot"]
+  (r,i,e) <- readProcessWithExitCode cmd args' i
+  bool
+    (error $ unpackUTF8 e)
+    (pure i)
+    (r==ExitSuccess)
+
+example1' :: G.Graph Int
+example1' = G.edges $
+    [(v, (v + 1) `mod` 6) | v <- [0 .. 5]]
+        ++ [(v, v + k) | v <- [0 .. 5], k <- [6, 12]]
+        ++ [(2, 18), (2, 19), (15, 18), (15, 19), (18, 3), (19, 3)]
+
+toStatementsInt :: G.Graph Int -> [Statement]
+toStatementsInt g =
+  ((\x -> StatementNode $ NodeStatement (NodeID (IDInt x) Nothing) (AttrList [])) <$> G.vertexList g) <>
+  ((\(x, y) ->
+      StatementEdge $
+      EdgeStatement
+      (EdgeID (Left (NodeID (IDInt x) Nothing)))
+      (EdgeRHSs $ fromList [EdgeRHS EdgeDirected (EdgeID (Left (NodeID (IDInt y) Nothing)))])
+      (AttrList [])) <$> G.edgeList g)
+
+-- |
+-- >>> g1 = defaultGrap & #statements %~ (<> toStatementsInt example1')
+-- >>> B.putStrLn =<< dotPrint <$> processGraph g1
+-- digraph {
+--     graph [bb="0,0,495.65,493.78";overlap=true;size="1!";splines=spline]
+--     node [height=0.5;label="\\N";shape=circle]
+--     edge [arrowsize=0]
+--     0 [pos="384.5,475.78";width=0.5]
+--     1 [pos="357.5,401.63";width=0.5]
+--     0 -> 1 [pos="e,363.57,418.85 378.51,458.77 374.1,446.99 368.12,431.02 363.67,419.13"]
+--     6 [pos="411.5,401.63";width=0.5]
+--     0 -> 6 [pos="e,405.43,418.85 390.49,458.77 394.9,446.99 400.87,431.02 405.32,419.13"]
+--     12 [height=0.55967;pos="467.5,401.63";width=0.55967]
+--     0 -> 12 [pos="e,452.8,415.41 397.83,463.19 412.75,450.22 436.85,429.27 452.43,415.73"]
+--     2 [pos="330.5,325.33";width=0.5]
+--     1 -> 2 [pos="e,336.35,342.42 351.64,384.51 347.15,372.14 340.97,355.15 336.45,342.72"]
+--     7 [pos="384.5,325.33";width=0.5]
+--     1 -> 7 [pos="e,378.65,342.42 363.36,384.51 367.85,372.14 374.03,355.15 378.54,342.72"]
+--     13 [height=0.55967;pos="440.5,325.33";width=0.55967]
+--     1 -> 13 [pos="e,425.95,339.36 370.47,389.02 385.4,375.66 409.87,353.75 425.58,339.69"]
+--     3 [pos="263.5,249.04";width=0.5]
+--     2 -> 3 [pos="e,275.26,263.08 318.83,311.39 306.7,297.94 287.81,277 275.55,263.4"]
+--     8 [pos="419.5,249.04";width=0.5]
+--     2 -> 8 [pos="e,406.15,261.18 344.02,313.05 360.71,299.11 388.95,275.54 405.75,261.51"]
+--     14 [height=0.55967;pos="475.5,249.04";width=0.55967]
+--     2 -> 14 [pos="e,459.28,261.56 344.39,313.55 348.48,310.63 353.06,307.61 357.5,305.19 394.93,284.71 408.73,289.04 446.5,269.19 450.64,267.01 454.93,\\\n264.4 458.9,261.81"]
+--     18 [height=0.55967;pos="239.5,96.445";width=0.55967]
+--     2 -> 18 [pos="e,221.18,105.3 313.92,317.87 277.75,302.66 192.9,260.73 166.5,192.89 160,176.2 158.52,168.63 166.5,152.59 177.74,130.02 203.11,114.24 \\\n220.76,105.5"]
+--     19 [height=0.55967;pos="335.5,96.445";width=0.55967]
+--     2 -> 19 [pos="e,335.94,116.84 331.52,307.33 332.98,282.28 335.56,234 336.5,192.89 336.91,174.98 336.66,170.5 336.5,152.59 336.39,140.81 336.16,\\\n127.62 335.94,117.09"]
+--     4 [pos="101.5,172.74";width=0.5]
+--     3 -> 4 [pos="e,117.56,181.11 247.37,240.64 216.44,226.46 149.09,195.57 117.92,181.27"]
+--     9 [pos="193.5,172.74";width=0.5]
+--     3 -> 9 [pos="e,205.67,186.66 251.62,235.43 238.93,221.96 218.89,200.69 205.97,186.98"]
+--     15 [height=0.55967;pos="287.5,172.74";width=0.55967]
+--     3 -> 15 [pos="e,281.6,192.01 268.82,231.55 272.58,219.93 277.61,204.35 281.51,192.29"]
+--     5 [pos="48.498,96.445";width=0.5]
+--     4 -> 5 [pos="e,58.506,111.47 91.279,157.42 81.908,144.28 68.101,124.92 58.727,111.78"]
+--     10 [height=0.55967;pos="104.5,96.445";width=0.55967]
+--     4 -> 10 [pos="e,103.72,116.67 102.19,154.51 102.65,143.28 103.24,128.61 103.71,116.95"]
+--     16 [height=0.55967;pos="162.5,96.445";width=0.55967]
+--     4 -> 16 [pos="e,150.12,112.52 112.69,158.11 123.2,145.31 138.91,126.18 149.86,112.83"]
+--     5 -> 0 [pos="e,366.23,475.02 49.439,114.6 50.887,142.55 53.498,199.64 53.498,248.04 53.498,326.33 53.498,326.33 53.498,326.33 53.498,464.3 295.89,\\\n474.85 365.82,475.02"]
+--     11 [height=0.54162;pos="19.498,20.148";width=0.54162]
+--     5 -> 11 [pos="e,26.284,38.534 42.206,79.323 37.545,67.382 31.197,51.119 26.397,38.823"]
+--     17 [height=0.55967;pos="77.498,20.148";width=0.55967]
+--     5 -> 17 [pos="e,70.506,39.061 54.791,79.323 59.386,67.552 65.62,51.579 70.394,39.349"]
+--     15 -> 18 [pos="e,250.12,113.89 276.85,155.25 268.95,143.04 258.24,126.45 250.31,114.18"]
+--     15 -> 19 [pos="e,324.88,113.89 298.15,155.25 306.04,143.04 316.76,126.45 324.69,114.18"]
+--     18 -> 3 [pos="e,260.79,231.06 242.53,116.49 247.24,145.99 256.21,202.31 260.74,230.72"]
+--     19 -> 3 [pos="e,277.53,237.38 334.82,116.79 333.41,136.85 329.16,168.62 316.5,192.89 307.11,210.88 290.05,227.04 277.82,237.15"]
+--     }
+processGraph :: Graph -> IO Graph
+processGraph g =
+  runDotParser <$> dotB (directed g) (dotPrint g)
+
+-- |
+-- >>> exG1' <- processGraph exG1
+-- >>> bb exG1'
+-- Just Rect 0.0 495.65 0.0 493.78
+bb :: Graph -> Maybe (Rect Double)
+bb g = case runParser rectP . packUTF8 <$> v of
+  Just (OK r _) -> Just r
+  _ -> Nothing
+  where
+    v = case Map.lookup (IDString "bb") (attributes g) of
+      (Just (IDQuoted q)) -> Just q
+      _ -> Nothing
+
+-- attributes :: AttributeType -> Graph -> Map.Map ID ID
+attributes :: Graph -> Map.Map ID ID
+attributes g = Map.fromList
+  [(x,y) | (IDStatement x y) <- ls]
+  where
+    ls = mconcat $ toList . aList <$> mconcat [xs |(StatementAttribute (AttributeStatement GraphType (AttrList xs))) <- view #statements g]
+
+-- |
+-- Ignores 'Port' information
+nodesG :: Graph -> Map.Map ID (Map.Map ID ID)
+nodesG g =
+  Map.fromList $
+  [(x, atts a) |
+   (StatementNode (NodeStatement (NodeID x _) a)) <- view #statements g]
+
+atts :: AttrList -> Map.Map ID ID
+atts a = Map.fromList $ (\(IDStatement x y) -> (x,y)) <$> mconcat (toList . aList <$> view #attrList a)
+
+edgesG :: Graph -> Map.Map (ID, ID) (Map.Map ID ID)
+edgesG g =
+  Map.fromList $
+  mconcat $ fmap (\(xs, a) -> (,a) <$> xs)
+  [(edgePairs e, atts $ view #edgeStatementAttributes e) |
+   (StatementEdge e) <- view #statements g]
+
+edgeID2ID :: EdgeID -> Maybe ID
+edgeID2ID x = case view #unedgeID x of
+  Left (NodeID x' _) -> Just x'
+  _ -> Nothing
+
+edgeStatement2IDs :: EdgeStatement -> [(Maybe ID,Maybe ID)]
+edgeStatement2IDs e = zip (id0:id1) id1
+  where
+    id0 = edgeID2ID (view #edgeStatementID e)
+    id1 = toList $ edgeID2ID . view #edgeID <$> view (#edgeStatementRHS % #edgeRHSs) e
+
+edgePairs :: EdgeStatement -> [(ID, ID)]
+edgePairs e = [(x,y) | (Just x, Just y) <- edgeStatement2IDs e]
+
+nodeA :: Graph -> ID -> Map.Map ID (Maybe ID)
+nodeA g a = fmap (Map.lookup a) (nodesG g)
+
+edgeA :: Graph -> ID -> Map.Map (ID,ID) (Maybe ID)
+edgeA g a = fmap (Map.lookup a) (edgesG g)
+
+
+gInt1 :: G.Graph Int
+gInt1 = G.edges $
+    [(v, (v + 1) `mod` 6) | v <- [0 .. 5]]
+        ++ [(v, v + k) | v <- [0 .. 5], k <- [6, 12]]
+        ++ [(2, 18), (2, 19), (15, 18), (15, 19), (18, 3), (19, 3)]
+
+exG1 :: Graph
+exG1 = defaultGraph & #statements %~ (<> toStatementsInt gInt1)
+
+exG1' :: Graph
+exG1' = unsafePerformIO $ processGraph exG1
+{-# NOINLINE exG1' #-}
+
+nodePos :: Graph -> Map.Map ID (Maybe (Point Double))
+nodePos g =
+  fmap (\x -> case x of
+           Just (IDQuoted x') -> Just (runParser_ pointP (packUTF8 x'))
+           _ -> Nothing) $
+  nodeA g (IDString "pos")
+
+nodeWidth :: Graph -> Map.Map ID (Maybe Double)
+nodeWidth g =
+  fmap (\x -> case x of
+           Just (IDDouble x') -> Just x'
+           _ -> Nothing) $
+  nodeA g (IDString "width")
+
+edgeWidth :: Graph -> Map.Map (ID, ID) (Maybe Double)
+edgeWidth g =
+  fmap (\x -> case x of
+           Just (IDDouble x') -> Just x'
+           _ -> Nothing) $
+  edgeA g (IDString "width")
+
+edgeCurve :: Graph -> Map.Map (ID, ID) (Maybe [Point Double])
+edgeCurve g =
+  fmap (\x -> case x of
+           Just (IDQuoted x') -> Just (runParser_ curveP (packUTF8 x'))
+           _ -> Nothing) $
+  edgeA g (IDString "pos")
+
+data NodeInfo = NodeInfo { nlabel :: Text, nwidth :: Double, pos :: Point Double } deriving (Eq, Show, Generic)
+
+nodeInfo :: Graph -> Double -> [NodeInfo]
+nodeInfo g w = [NodeInfo (Text.pack $ label x) (fromMaybe w (join w')) p | (x, (Just p, w')) <- xs]
+  where
+    xs = Map.toList $
+         merge
+         (mapMissing (\_ v -> (v,Nothing)))
+         dropMissing
+         (zipWithMatched (\_ x y -> (x,Just y)))
+         (nodePos g)
+         (nodeWidth g)
+
+data EdgeInfo = EdgeInfo { ewidth :: Double, curve :: [PathData Double] } deriving (Eq, Show, Generic)
+
+edgeInfo :: Graph -> Double -> [EdgeInfo]
+edgeInfo g w = [EdgeInfo (fromMaybe w (join w')) (toPathDataE p) | ((_, _), (Just p, w')) <- xs]
+  where
+    xs = Map.toList $
+         merge
+         (mapMissing (\_ v -> (v,Nothing)))
+         dropMissing
+         (zipWithMatched (\_ x y -> (x,Just y)))
+         (edgeCurve g)
+         (edgeWidth g)
+
+
+chunksOf :: Int -> [e] -> [[e]]
+chunksOf _ [] = [[]]
+chunksOf n xs = [Prelude.take n xs] <> chunksOf n (Prelude.drop n xs)
+
+-- |
+--
+-- https://graphviz.org/docs/attr-types/splineType/
+-- format of the example is end point point and then triples (5,8,11 lengths are 1, 2 and 3 cubics)
+--
+toPathDataE :: [Point Double] -> [PathData Double]
+toPathDataE [] = []
+toPathDataE (e:h:xs) = [StartP h] <> catMaybes (cubic <$> chunksOf 3 xs) <> [LineP e]
+  where
+    cubic [x,y,z] = Just (CubicP x y z)
+    cubic _ = Nothing
+toPathDataE _ = []
+
+-- | convert a (processed) 'Graph' to a 'ChartSvg'
+--
+-- >>> writeChartSvg "exg1.svg" (graphToChart exG1')
+graphToChart :: Graph -> ChartSvg
+graphToChart g =
+  mempty
+    & #charts .~ unnamed (ps <> c0 <> [ts])
+    & #svgOptions % #svgHeight .~ 500
+    & #hudOptions .~ (mempty & #chartAspect .~ ChartAspect)
+  where
+    vshift' = -3.7
+    -- node information
+    ns = nodeInfo g 0.5
+    -- edge information
+    es = edgeInfo g 0.5
+    -- paths
+    ps = fmap (\(EdgeInfo w p) -> PathChart (defaultPathStyle & #borderSize .~ w & #borderColor .~ black & #color .~ transparent) p) es
+    -- circles
+    c0 = fmap (\(NodeInfo _ w p) -> GlyphChart (defaultGlyphStyle & #shape .~ CircleGlyph & #size .~ 72 * w & #borderSize .~ 0.5 & #borderColor .~ black & #color .~ transparent) [p]) ns
+    -- labels
+    ts =
+      TextChart (defaultTextStyle & #size .~ 14) ((\(NodeInfo l _ (Point x y)) -> (l,Point x (vshift' + y))) <$> ns)
+
+data Class
+  = Magma
+  | Unital
+  | Associative
+  | Commutative
+  | Invertible
+  | Idempotent
+  | Absorbing
+  | Group
+  | AbelianGroup
+  | Additive
+  | Subtractive
+  | Multiplicative
+  | Divisive
+  | Distributive
+  | Semiring
+  | Ring
+  | IntegralDomain
+  | Field
+  | ExpField
+  | QuotientField
+  | UpperBoundedField
+  | LowerBoundedField
+  | TrigField
+  | -- Higher-kinded numbers
+    AdditiveAction
+  | SubtractiveAction
+  | MultiplicativeAction
+  | DivisiveAction
+  | Module
+  | -- Lattice
+    JoinSemiLattice
+  | MeetSemiLattice
+  | Lattice
+  | BoundedJoinSemiLattice
+  | BoundedMeetSemiLattice
+  | BoundedLattice
+  | -- Number Types
+    Integral
+  | Ratio
+  | -- Measure
+    Signed
+  | Norm
+  | Basis
+  | Direction
+  | Epsilon
+  deriving (Show, Eq, Ord)
+
+data Cluster
+  = GroupCluster
+  | LatticeCluster
+  | RingCluster
+  | FieldCluster
+  | HigherKindedCluster
+  | MeasureCluster
+  | NumHaskCluster
+  deriving (Show, Eq, Ord)
+
+clusters :: Map.Map Class Cluster
+clusters =
+  Map.fromList
+    [ (Magma, GroupCluster),
+      (Unital, GroupCluster),
+      (Associative, GroupCluster),
+      (Commutative, GroupCluster),
+      (Invertible, GroupCluster),
+      (Idempotent, GroupCluster),
+      (Absorbing, GroupCluster),
+      (Group, GroupCluster),
+      (AbelianGroup, GroupCluster),
+      (Additive, NumHaskCluster),
+      (Subtractive, NumHaskCluster),
+      (Multiplicative, NumHaskCluster),
+      (Divisive, NumHaskCluster),
+      (Distributive, NumHaskCluster),
+      (Semiring, NumHaskCluster),
+      (Ring, NumHaskCluster),
+      (IntegralDomain, NumHaskCluster),
+      (Field, NumHaskCluster),
+      (ExpField, FieldCluster),
+      (QuotientField, FieldCluster),
+      (UpperBoundedField, FieldCluster),
+      (LowerBoundedField, FieldCluster),
+      (TrigField, FieldCluster),
+      (AdditiveAction, HigherKindedCluster),
+      (SubtractiveAction, HigherKindedCluster),
+      (MultiplicativeAction, NumHaskCluster),
+      (DivisiveAction, HigherKindedCluster),
+      (Module, NumHaskCluster),
+      (JoinSemiLattice, LatticeCluster),
+      (MeetSemiLattice, LatticeCluster),
+      (Lattice, LatticeCluster),
+      (BoundedJoinSemiLattice, LatticeCluster),
+      (BoundedMeetSemiLattice, LatticeCluster),
+      (BoundedLattice, LatticeCluster),
+      (Norm, RingCluster),
+      (Basis, RingCluster),
+      (Direction, RingCluster),
+      (Signed, RingCluster),
+      (Epsilon, MeasureCluster),
+      (Integral, RingCluster),
+      (Ratio, FieldCluster)
+    ]
+
+data Family
+  = Addition
+  | Multiplication
+  | Actor
+  deriving (Show, Eq, Ord)
+
+data Dependency = Dependency
+  { _class :: Class,
+    _dep :: Class,
+    _op :: Maybe Family
+  }
+  deriving (Show, Eq, Ord)
+
+dependencies :: [Dependency]
+dependencies =
+  [ Dependency Unital Magma Nothing,
+    Dependency Associative Magma Nothing,
+    Dependency Commutative Magma Nothing,
+    Dependency Invertible Magma Nothing,
+    Dependency Idempotent Magma Nothing,
+    Dependency Absorbing Magma Nothing,
+    Dependency Group Unital Nothing,
+    Dependency Group Invertible Nothing,
+    Dependency Group Associative Nothing,
+    Dependency AbelianGroup Unital Nothing,
+    Dependency AbelianGroup Invertible Nothing,
+    Dependency AbelianGroup Associative Nothing,
+    Dependency AbelianGroup Commutative Nothing,
+    Dependency Additive Commutative (Just Addition),
+    Dependency Additive Unital (Just Addition),
+    Dependency Additive Associative (Just Addition),
+    Dependency Subtractive Invertible (Just Addition),
+    Dependency Subtractive Additive (Just Addition),
+    Dependency Multiplicative Unital (Just Multiplication),
+    Dependency Multiplicative Associative (Just Multiplication),
+    Dependency Multiplicative Commutative (Just Multiplication),
+    Dependency Divisive Invertible (Just Multiplication),
+    Dependency Divisive Multiplicative (Just Multiplication),
+    Dependency Distributive Additive (Just Addition),
+    Dependency Distributive Multiplicative (Just Multiplication),
+    Dependency Distributive Absorbing Nothing,
+    Dependency Ring Distributive Nothing,
+    Dependency Ring Subtractive (Just Addition),
+    Dependency IntegralDomain Ring Nothing,
+    Dependency Field Ring Nothing,
+    Dependency Field Divisive (Just Multiplication),
+    Dependency ExpField Field Nothing,
+    Dependency QuotientField Field Nothing,
+    Dependency QuotientField Ring Nothing,
+    Dependency TrigField Field Nothing,
+    Dependency UpperBoundedField Field Nothing,
+    Dependency LowerBoundedField Field Nothing,
+    -- higher-kinded relationships
+    Dependency AdditiveAction Additive (Just Actor),
+    Dependency SubtractiveAction Subtractive (Just Actor),
+    Dependency MultiplicativeAction Multiplicative (Just Actor),
+    Dependency DivisiveAction Divisive (Just Actor),
+    Dependency Module Distributive (Just Actor),
+    Dependency Module MultiplicativeAction Nothing,
+    -- Lattice
+    Dependency JoinSemiLattice Associative Nothing,
+    Dependency JoinSemiLattice Commutative Nothing,
+    Dependency JoinSemiLattice Idempotent Nothing,
+    Dependency MeetSemiLattice Associative Nothing,
+    Dependency MeetSemiLattice Commutative Nothing,
+    Dependency MeetSemiLattice Idempotent Nothing,
+    Dependency Lattice JoinSemiLattice Nothing,
+    Dependency Lattice MeetSemiLattice Nothing,
+    Dependency BoundedJoinSemiLattice JoinSemiLattice Nothing,
+    Dependency BoundedJoinSemiLattice Unital Nothing,
+    Dependency BoundedMeetSemiLattice MeetSemiLattice Nothing,
+    Dependency BoundedMeetSemiLattice Unital Nothing,
+    Dependency BoundedLattice BoundedJoinSemiLattice Nothing,
+    Dependency BoundedLattice BoundedMeetSemiLattice Nothing,
+    Dependency Signed Ring Nothing,
+    Dependency Norm Ring Nothing,
+    Dependency Basis Ring Nothing,
+    Dependency Direction Ring Nothing,
+    Dependency Epsilon Subtractive Nothing,
+    Dependency Epsilon MeetSemiLattice Nothing,
+    Dependency Integral Ring Nothing,
+    Dependency Ratio Field Nothing
+  ]
+
+magmaClasses :: [Class]
+magmaClasses =
+  [ Magma,
+    Unital,
+    Associative,
+    Commutative,
+    Invertible,
+    Absorbing,
+    Additive,
+    Subtractive,
+    Multiplicative,
+    Divisive,
+    Distributive,
+    Ring,
+    Field
+  ]
+
+classesNH :: [Class]
+classesNH =
+  [ Additive,
+    Subtractive,
+    Multiplicative,
+    Divisive,
+    Distributive,
+    Ring,
+    Field,
+    ExpField,
+    QuotientField,
+    TrigField,
+    Signed,
+    Norm,
+    Basis,
+    Direction,
+    MultiplicativeAction,
+    Module,
+    UpperBoundedField,
+    LowerBoundedField,
+    Integral,
+    Ratio
+  ]
+
+graphNH :: L.Graph (First Family) Class
+graphNH =
+  L.edges ((\(Dependency x y l) -> (First l,x,y)) <$> dependencies) <>
+  L.vertices classesNH
+
+fromFamily :: First Family -> Colour
+fromFamily (First f) = case f of
+  Nothing -> palette1 0
+  Just Addition -> palette1 1
+  Just Multiplication -> palette1 2
+  Just Actor -> palette1 3
+
+toStatementsShow :: (Show a, Ord a, Monoid e, Eq e) => L.Graph e a -> [Statement]
+toStatementsShow g =
+  ((\x -> StatementNode $ NodeStatement (NodeID (IDQuoted (show x)) Nothing) (AttrList [])) <$> L.vertexList g) <>
+  ((\(_, x, y) ->
+      StatementEdge $
+      EdgeStatement
+      (EdgeID (Left (NodeID (IDQuoted (show x)) Nothing)))
+      (EdgeRHSs $ fromList [EdgeRHS EdgeDirected (EdgeID (Left (NodeID (IDQuoted (show y)) Nothing)))])
+      (AttrList [])) <$> L.edgeList g)
+
+
+dotGraphNH :: Graph
+dotGraphNH = defaultGraph & #statements %~ (<> toStatementsShow graphNH)
+
+dotGraphNH' :: Graph
+dotGraphNH' = unsafePerformIO $ processGraph dotGraphNH
+{-# NOINLINE dotGraphNH' #-}
+
+
+-- >>> writeChartSvg "other/nh.svg" (graphToChartL dotGraphNH')
+graphToChartL :: Graph -> ChartSvg
+graphToChartL g =
+  mempty
+    & #charts .~ unnamed (ps <> c0 <> [ts])
+    & #svgOptions % #svgHeight .~ 500
+    & #hudOptions .~ (mempty & #chartAspect .~ ChartAspect)
+  where
+    vshift' = -3.7
+    -- node information
+    ns = nodeInfo g 0.5
+    -- edge information
+    es = edgeInfo g 0.5
+    -- paths
+    ps = fmap (\(EdgeInfo w p) -> PathChart (defaultPathStyle & #borderSize .~ w & #borderColor .~ black & #color .~ transparent) p) es
+    -- circles
+    c0 = fmap (\(NodeInfo _ w p) -> GlyphChart (defaultGlyphStyle & #shape .~ CircleGlyph & #size .~ 72 * w & #borderSize .~ 0.5 & #borderColor .~ black & #color .~ transparent) [p]) ns
+    -- labels
+    ts =
+      TextChart (defaultTextStyle & #size .~ 14) ((\(NodeInfo l _ (Point x y)) -> (l,Point x (vshift' + y))) <$> ns)
