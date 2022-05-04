@@ -1,23 +1,26 @@
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE NegativeLiterals #-}
 {-# LANGUAGE OverloadedLabels #-}
-{-# LANGUAGE RebindableSyntax #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE FlexibleContexts #-}
 
-module Chart.NumHask where
+-- | Example of Dot graph construction for the NumHask class heirarchy.
+module DotParse.Examples.NumHask where
 
-import Chart
-import Chart.GraphViz
-import Optics.Core
-import qualified Data.Graph.Inductive as G
-import qualified Data.GraphViz as G
-import qualified Data.GraphViz.Attributes.Complete as G
+import Prelude hiding (replicate)
 import qualified Data.Map.Strict as Map
-import Data.Text (pack)
-import qualified Data.Text as Text
-import Data.Text.Lazy (fromStrict)
-import GHC.OverloadedLabels
-import NumHask.Prelude
-import Data.Bifunctor
+import Optics.Core
+import GHC.IO.Unsafe
+import Chart
+import qualified Algebra.Graph.Labelled as L
+import Data.Monoid
+import DotParse
+import Algebra.Graph.ToGraph
+
+-- $setup
+-- >>> import DotParse
+-- >>> :set -XOverloadedStrings
 
 data Class
   = Magma
@@ -248,113 +251,28 @@ classesNH =
     Ratio
   ]
 
-toEdge :: Dependency -> (Class, Class, Maybe Family)
-toEdge (Dependency to' from' wrapper) = (from', to', wrapper)
+graphNH :: L.Graph (First Family) Class
+graphNH =
+  L.edges ((\(Dependency x y l) -> (First l,x,y)) <$> dependencies) <>
+  L.vertices classesNH
 
-graphNH :: G.Gr Class (Maybe Family)
-graphNH = mkGraph classesNH (toEdge <$> dependencies)
+fromFamily :: First Family -> Colour
+fromFamily (First f) = case f of
+  Nothing -> palette1 0
+  Just Addition -> palette1 1
+  Just Multiplication -> palette1 2
+  Just Actor -> palette1 3
 
--- writeChartSvg "nh.svg" $ graphToChart g
-layout :: ConfigNH -> G.Gr Class (Maybe Family) -> IO (G.Gr (G.AttributeNode Class) (G.AttributeEdge (Maybe Family)))
-layout cfg =
-  layoutGraph
-    (paramsNH cfg)
-    G.Dot
+dotGraphNH :: Graph
+dotGraphNH = defaultGraph & #statements %~ (<> toStatementsShow (toGraph graphNH))
 
-data ConfigNH = ConfigNH
-  { nhWidth :: Double,
-    magic :: Double,
-    rheight :: Double,
-    rcolor :: Colour,
-    ecolor :: Colour,
-    esize :: Double,
-    tsize :: Double,
-    tnudge :: Double,
-    psize :: Double,
-    pheight :: Double,
-    pwidth :: Double,
-    pwpad :: Double
-  }
-  deriving (Eq, Show, Generic)
+dotGraphNH' :: Graph
+dotGraphNH' = unsafePerformIO $ processGraph dotGraphNH
+{-# NOINLINE dotGraphNH' #-}
 
-defaultConfigNH :: ConfigNH
-defaultConfigNH = ConfigNH 0.005 36.08 0.3 (set opac' 0.1 $ palette1 0) (palette1 1) 0.005 0.04 -2.0 1.0 0.25 0.06 0.3
-
--- | Example parameters for GraphViz.
-paramsNH :: ConfigNH -> G.GraphvizParams G.Node Class (Maybe Family) Cluster Class
-paramsNH cfg =
-  G.defaultParams
-    { G.globalAttributes =
-        [ G.NodeAttrs
-            [ G.Shape G.BoxShape
-            ],
-          G.GraphAttrs
-            [ G.Overlap G.ScaleOverlaps,
-              G.Splines G.SplineEdges,
-              G.Size (G.GSize (cfg ^. #psize) Nothing True)
-            ],
-          G.EdgeAttrs [G.ArrowSize 0]
-        ],
-      G.isDirected = False,
-      G.isDotCluster = const True,
-      G.clusterID = G.Str . (fromStrict . pack . show),
-      G.clusterBy = \(n, l) -> G.C (clusters Map.! l) (G.N (n, l)),
-      G.fmtNode = \(_, l) ->
-        [ G.Height (cfg ^. #pheight),
-          G.Width
-            ( (cfg ^. #pwpad) + (cfg ^. #pwidth)
-                * fromIntegral (Text.length $ (pack . show) l)
-            )
-        ]
-    }
-
--- | convert the numhask class graph to a chart
-chartNH :: ConfigNH -> G.Gr (G.AttributeNode Class) (G.AttributeEdge e) -> ChartSvg
-chartNH cfg gr =
-  mempty
-    & #charts .~ unnamed (cs <> c0 <> [ts])
-    & #hudOptions .~ (mempty & #frames %~ fmap (second (#buffer .~ 0.02)) & #chartAspect .~ ChartAspect)
-  where
-    g = getGraph gr
-    bs = mconcat $ (\(_, _, _, ps) -> ps) <$> snd g
-    ns = Map.toList $ fst g
-    cs = infosToChart (cfg ^. #nhWidth) (cfg ^. #ecolor) . singletonCubic <$> bs
-    ws = getWidth . fst . snd <$> G.labNodes gr
-    c0 =
-      zipWith
-        ( \w (Point x y) ->
-              RectChart (defaultRectStyle & #borderSize .~ (cfg ^. #esize) & #color .~ (cfg ^. #rcolor))
-              [Rect (-m * w + x) (m * w + x) (-m * h + y) (m * h + y)]
-        )
-        (fromMaybe one <$> ws)
-        (snd <$> ns)
-    ts = TextChart
-         (defaultTextStyle & #size .~ cfg ^. #tsize)
-         (fmap (\(x,y) -> (pack . show $ x, y + Point 0 (cfg ^. #tnudge))) ns)
-    m = cfg ^. #magic
-    h = cfg ^. #rheight
-
--- | make the damn chart already!
+-- |
 --
--- >>> makeChartNH defaultConfigNH
---
--- ![chart](nh.svg)
-makeChartNH :: ConfigNH -> IO ()
-makeChartNH c = do
-  g <- layout c $ mkGraph classesNH (toEdge <$> dependencies)
-  writeChartSvg "nh.svg" $ chartNH c g
-
--- | magma chart
---
--- >>> makeChartMagma defaultConfigNH
---
--- ![chart](nhmagma.svg)
-makeChartMagma :: ConfigNH -> IO ()
-makeChartMagma c = do
-  g <- layout c $ mkGraph magmaClasses (toEdge <$> dependencies)
-  writeChartSvg "nhmagma.svg" $
-    chartNH c g & #charts
-      %~ ( \x ->
-             x
-               <> unnamed [LineChart (defaultLineStyle & #color .~ Colour 0.9 0.2 0.02 1 & #size .~ 0.005 & #dasharray ?~ [0.03, 0.01] & #linecap ?~ LineCapRound) [[Point 50 230, Point 370 230]]]
-         )
+-- >>> import Chart
+-- >>> writeChartSvg "other/nh.svg" nhExample
+nhExample :: ChartSvg
+nhExample = graphToChart dotGraphNH'

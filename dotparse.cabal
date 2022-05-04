@@ -1,20 +1,20 @@
 cabal-version: 2.4
-name:          chart-svg-graphviz
+name:          dotparse
 version:       0.0.1
-synopsis:      See readme.md
-description:   See readme.md for description.
+synopsis:      dot language parsing and printing.
+description:   A dot language parser and printer.
 category:      project
 author:        Tony Day
 maintainer:    tonyday567@gmail.com
-copyright:     Tony Day (c) AfterTimes
+copyright:     Tony Day (c) 2022
 license:       BSD-3-Clause
-homepage:      https://github.com/tonyday567/chart-svg-graphviz#readme
-bug-reports:   https://github.com/tonyday567/chart-svg-graphviz/issues
+homepage:      https://github.com/tonyday567/dotparser#readme
+bug-reports:   https://github.com/tonyday567/dotparser/issues
 build-type:    Simple
 
 source-repository head
   type:     git
-  location: https://github.com/tonyday567/chart-svg-graphviz
+  location: https://github.com/tonyday567/dotparser
 
 library
   hs-source-dirs:     src
@@ -28,8 +28,6 @@ library
     , base           >=4.7         && <5
     , chart-svg      ^>=0.3
     , containers     ^>=0.6
-    , fgl            ^>=5.7
-    , graphviz       >=2999.20.1.0 && <3000
     , numhask        ^>=0.10
     , numhask-space  ^>=0.10
     , optics-core
@@ -43,10 +41,11 @@ library
     , process-extras
 
   exposed-modules:
-    Chart.GraphViz
-    Chart.NumHask
-    Dot
-    Dot.TH
+    DotParse
+    DotParse.FlatParse
+    DotParse.FlatParse.TH
+    DotParse.Examples
+    DotParse.Examples.NumHask
 
   other-modules:
   default-language:   Haskell2010

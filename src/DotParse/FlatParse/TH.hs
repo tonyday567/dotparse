@@ -7,10 +7,8 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
--- | Abstract Grammar from:
--- http://www.graphviz.org/doc/info/lang.html
-
-module Dot.TH where
+-- | TH stage restriction guff for flatparsing
+module DotParse.FlatParse.TH where
 
 import Language.Haskell.TH
 import FlatParse.Basic
