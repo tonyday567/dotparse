@@ -71,13 +71,12 @@ module DotParse.Types
    toPathDataE,
 
    -- * Algebraic.Graph conversion
-   toStatementsShow,
+   toStatements,
 
  ) where
 
 import FlatParse.Basic hiding (cut, lines)
 import DotParse.FlatParse
-import qualified Data.ByteString.Char8 as C
 import GHC.Generics
 import NeatInterpolation
 import Data.Text.Encoding (encodeUtf8)
@@ -178,31 +177,31 @@ instance DotParse Directed
 --
 -- >>> runDotParser (encodeUtf8 [trimming|<The <font color='red'><b>foo</b></font>,<br/> the <font point-size='20'>bar</font> and<br/> the <i>baz</i>>|]) :: ID
 -- IDHtml "<The <font color='red'><b>foo</b></font>,<br/> the <font point-size='20'>bar</font> and<br/> the <i>baz</i>>"
-data ID = ID String | IDInt Int | IDDouble Double | IDQuoted String | IDHtml String deriving (Eq, Show, Generic, Ord)
+data ID = ID ByteString | IDInt Int | IDDouble Double | IDQuoted ByteString | IDHtml ByteString deriving (Eq, Show, Generic, Ord)
 
 instance DotParse ID
   where
-    dotPrint (ID s) = packUTF8 s
+    dotPrint (ID s) = s
     dotPrint (IDInt i) = packUTF8 (show i)
     dotPrint (IDDouble x) = packUTF8 (show x)
     dotPrint (IDQuoted x) =
-      wrapQuotePrint (packUTF8 x)
-    dotPrint (IDHtml s) = packUTF8 s
+      wrapQuotePrint x
+    dotPrint (IDHtml s) = s
 
     -- order matters
     dotParse =
-      (ID . C.unpack <$> ident) <|>
+      (ID <$> ident) <|>
       (IDInt <$> (signed int `notFollowedBy` $(char '.'))) <|>
       (IDDouble <$> signed double) <|>
-      (IDQuoted <$> quoted) <|>
-      (IDHtml <$> htmlLike)
+      (IDQuoted . packUTF8 <$> quoted) <|>
+      (IDHtml . packUTF8 <$> htmlLike)
 
 label :: ID -> String
-label (ID s) = s
+label (ID s) = unpackUTF8 s
 label (IDInt i) = show i
 label (IDDouble d) = show d
-label (IDQuoted q) = q
-label (IDHtml h) = h
+label (IDQuoted q) = unpackUTF8 q
+label (IDHtml h) = unpackUTF8 h
 
 -- | Attribute key-value pair
 --
@@ -491,7 +490,7 @@ processGraph g =
 
 -- | Bounding Box
 bb :: Graph -> Maybe (Rect Double)
-bb g = case runParser rectP . packUTF8 <$> v of
+bb g = case runParser rectP <$> v of
   Just (OK r _) -> Just r
   _ -> Nothing
   where
@@ -540,7 +539,7 @@ nodePos :: Graph -> Map.Map ID (Maybe (Point Double))
 nodePos g =
   fmap
   (\case
-      (Just (IDQuoted x')) -> Just (runParser_ pointP (packUTF8 x'))
+      (Just (IDQuoted x')) -> Just (runParser_ pointP x')
       _ -> Nothing) $
   nodeA g (ID "pos")
 
@@ -561,7 +560,7 @@ edgeWidth g =
 edgeCurve :: Graph -> Map.Map (ID, ID) (Maybe [Point Double])
 edgeCurve g =
   fmap (\case
-           Just (IDQuoted x') -> Just (runParser_ curveP (packUTF8 x'))
+           Just (IDQuoted x') -> Just (runParser_ curveP x')
            _ -> Nothing) $
   edgeA g (ID "pos")
 
@@ -635,12 +634,12 @@ graphToChart g =
     ts =
       TextChart (defaultTextStyle & #size .~ 14) ((\(NodeInfo l _ (Point x y)) -> (l,Point x (vshift' + y))) <$> ns)
 
-toStatementsShow :: (Show a, Ord a) => G.Graph a -> [Statement]
-toStatementsShow g =
-  ((\x -> StatementNode $ NodeStatement (NodeID (IDQuoted (show x)) Nothing) (Attrs [])) <$> G.vertexList g) <>
+toStatements :: G.Graph ByteString -> [Statement]
+toStatements g =
+  ((\x -> StatementNode $ NodeStatement (NodeID (IDQuoted x) Nothing) (Attrs [])) <$> G.vertexList g) <>
   ((\(x, y) ->
       StatementEdge $
       EdgeStatement
-      (EdgeID (Left (NodeID (IDQuoted (show x)) Nothing)))
-      (EdgeRHSs $ fromList [EdgeRHS EdgeDirected (EdgeID (Left (NodeID (IDQuoted (show y)) Nothing)))])
+      (EdgeID (Left (NodeID (IDQuoted x) Nothing)))
+      (EdgeRHSs $ fromList [EdgeRHS EdgeDirected (EdgeID (Left (NodeID (IDQuoted y) Nothing)))])
       (Attrs [])) <$> G.edgeList g)

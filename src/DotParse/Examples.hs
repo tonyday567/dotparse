@@ -420,9 +420,9 @@ gInt1 = G.edges $
 
 {- |
 
->>> import qualified Data.ByteString.Char8 as B
->>> g <- processGraph exInt
->>> B.putStrLn $ dotPrint g
+> import qualified Data.ByteString.Char8 as B
+> g <- processGraph exInt
+> B.putStrLn $ dotPrint g
 digraph {
     graph [bb="0,0,495.65,493.78";overlap=false;size="1!";splines=spline]
     node [height=0.5;label="\N";shape=circle]
@@ -479,4 +479,4 @@ digraph {
 
 -}
 exInt :: Graph
-exInt = defaultGraph & #statements %~ (<> toStatementsShow gInt1)
+exInt = defaultGraph & #statements %~ (<> toStatements (packUTF8 . show <$> gInt1))

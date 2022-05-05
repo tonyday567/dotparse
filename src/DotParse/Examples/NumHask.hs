@@ -264,7 +264,7 @@ fromFamily (First f) = case f of
   Just Actor -> palette1 3
 
 dotGraphNH :: Graph
-dotGraphNH = defaultGraph & #statements %~ (<> toStatementsShow (toGraph graphNH))
+dotGraphNH = defaultGraph & #statements %~ (<> toStatements (packUTF8 . show <$> toGraph graphNH))
 
 dotGraphNH' :: Graph
 dotGraphNH' = unsafePerformIO $ processGraph dotGraphNH
