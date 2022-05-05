@@ -1,0 +1,62 @@
+#+TITLE: dotparse
+
+Abstract grammar: [[http://www.graphviz.org/doc/info/lang.html][DOT Language | Graphviz]]
+
+[[http://magjac.com/graphviz-visual-editor/][Graphviz Visual Editor]]
+[[http://www.graphviz.org/doc/info/attrs.html][Attributes | Graphviz]]
+
+
+[[https://www.graphviz.org/][Graphviz]]
+
+[[http://www.graphviz.org/pdf/dot.1.pdf]]
+
+Graphviz practical examples:
+
+https://renenyffenegger.ch/notes/tools/Graphviz/examples/index
+https://renenyffenegger.ch/notes/tools/Graphviz/attributes/label/HTML-like/index
+
+DOT language parser/printer
+
+Dot graph representations:
+
+[[https://hackage.haskell.org/package/graphviz-2999.20.1.0/docs/Data-GraphViz-Types-Generalised.html][Data.GraphViz.Types.Generalised]]
+
+[[https://hackage.haskell.org/package/dotgen-0.4.3/docs/Text-Dot.html][Text.Dot]]
+
+Graph representations
+
+[[https://hackage.haskell.org/package/containers-0.6.5.1/docs/Data-Graph.html][Data.Graph]]
+
+[[https://hackage.haskell.org/package/calligraphy]]
+https://www.reddit.com/r/haskell/comments/qjxjh5/ann_jordan_abstract_inspectable_json/
+
+https://kowainik.github.io/posts/2019-01-14-tomland
+
+https://hackage.haskell.org/package/jordan
+
+** Graphviz
+
+[[https://www.graphviz.org/][Graphviz]]
+[[http://magjac.com/graphviz-visual-editor/][Graphviz Visual Editor]]
+[[http://www.graphviz.org/doc/info/lang.html][DOT Language | Graphviz]]
+
+Command line reference:
+[[http://www.graphviz.org/pdf/dot.1.pdf]]
+
+
+-- The language supports C++-style comments: /* */ and //. In addition, a line beginning with a ‘#’ character is considered a line output from a C preprocessor (e.g., # 34 to indicate line 34 ) and discarded.
+-- case-insensitive
+-- https://github.com/AndrasKovacs/flatparse/issues/10
+
+-- comma separated list of numbers
+-- https://github.com/kolmodin/advent-of-code-2021/blob/4e569f7c8082327c566106562c20e3ff0c1b1fe7/bins/Day04.hs
+-- exon usage
+-- https://github.com/tek/exon/blob/4fdaa65dfaa3a9dcd0888fd5036be9d3d70447c0/packages/exon/lib/Exon/Parse.hs
+
+** other attempts
+- [ ] refactor fgl/graphviz out
+- [ ] https://hackage.haskell.org/package/dotgen
+- [ ] algebraic graphs
+  https://hackage.haskell.org/package/algebraic-graphs-0.6/docs/Algebra-Graph.html
+- [ ] calligraphy just slams down a dot file and doesn't use any dot/graphviz library
+  [[https://github.com/jonascarpay/calligraphy/blob/master/src/Calligraphy/Phases/Render.hs][calligraphy/Render.hs at master · jonascarpay/calligraphy · GitHub]]

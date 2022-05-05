@@ -16,30 +16,7 @@ import Data.Functor
 import Data.ByteString hiding (length, head, reverse)
 import qualified Data.ByteString.Char8 as B
 
-isKeyword :: Span -> Parser e ()
-isKeyword span' = inSpan span' do
-  $(switch [| case _ of
-      "strict" -> pure ()
-      "graph" -> pure ()
-      "digraph" -> pure ()
-      "node"  -> pure ()
-      "edge"  -> pure ()
-      "subgraph" -> pure ()
-      "n"  -> pure ()
-      "ne"  -> pure ()
-      "e"  -> pure ()
-      "se"  -> pure ()
-      "s"  -> pure ()
-      "sw"  -> pure ()
-      "w"  -> pure ()
-      "nw"  -> pure ()
-      "c"  -> pure ()
-      "_"  -> pure ()
-       |])
-  eof
-
 -- | Consume whitespace.
-
 ws :: Parser e ()
 ws = $(switch [| case _ of
   -- order matters
@@ -54,6 +31,11 @@ ws = $(switch [| case _ of
   "//" -> lineComment
   "/*" -> multilineComment
   _    -> pure () |])
+
+-- | Consume whitespace after running a parser.
+token :: Parser e a -> Parser e a
+token p = p <* ws
+{-# inline token #-}
 
 -- | Parse a line comment.
 lineComment :: Parser e ()
@@ -80,11 +62,6 @@ htmlLike = ws *> $(char '<') *> go (1 :: Int) "<" where
     ($(char '>') *> go (n - 1) ('>':acc)) <|>
     ($(char '<') *> go (n + 1) ('<':acc)) <|>
     (anyChar >>= (\c -> go n (c:acc)))
-
--- | Consume whitespace after running a parser.
-token :: Parser e a -> Parser e a
-token p = p <* ws
-{-# inline token #-}
 
 isValidStartChar :: Char -> Bool
 isValidStartChar c =
@@ -120,11 +97,9 @@ symbol' str = [| $(symbol str) `cut'` packUTF8 str |]
 keyword' :: String -> Q Exp
 keyword' str = [| $(keyword str) `cut'` packUTF8 str |]
 
--- | Parse an identifier. This parser uses `isKeyword` to check that an identifier is not a
---   keyword.
+-- | Parse an identifier.
 ident :: Parser e ByteString
 ident = token $ byteStringOf $
---   spanned (identStartChar *> many_ identChar) (\_ span -> fails (isKeyword span))
   identStartChar *> many_ identChar
 
 -- | Parse an identifier, throw a precise error on failure.

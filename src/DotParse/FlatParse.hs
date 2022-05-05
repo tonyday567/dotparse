@@ -11,9 +11,41 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TupleSections #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use <$>" #-}
 
 -- | Lower-level flatparse parsers
-module DotParse.FlatParse where
+module DotParse.FlatParse
+  ( Error(..),
+    prettyError,
+    keyword,
+    keyword',
+    symbol,
+    symbol',
+    ws,
+    token,
+    ident,
+    cut,
+    cut',
+    testParser,
+    runParser_,
+    int,
+    double,
+    signed,
+    quoted,
+    htmlLike,
+    sepP,
+    wrapSquareP,
+    wrapSquarePrint,
+    wrapCurlyP,
+    wrapCurlyPrint,
+    wrapQuotePrint,
+    pointP,
+    curveP,
+    rectP,
+    boolP,
+    nonEmptyP,
+  ) where
 
 import FlatParse.Basic hiding (cut, lines)
 import DotParse.FlatParse.TH hiding (merge)
@@ -23,6 +55,7 @@ import Data.Bool
 import Prelude hiding (replicate)
 import qualified Data.ByteString.Char8 as B
 import NumHask.Space
+import Data.List.NonEmpty
 
 -- $setup
 -- >>> import DotParse
@@ -91,6 +124,13 @@ double = token do
 signed :: Num b => Parser e b -> Parser e b
 signed p = optioned $(char '-') (const (((-1) *) <$> p)) p
 
+-- | Looks ahead for a "/"" that may be in the quoted string.
+-- >>> runParser quoted (packUTF8 "\"hello\"")
+-- OK "hello" ""
+--
+-- >>> runParser quoted (packUTF8 "\"hello/\"\"")
+-- OK "hello\"" ""
+--
 quoted :: Parser Error String
 quoted =
   $(symbol "\"") *> many unquoteQuote <* $(symbol' "\"")
@@ -102,6 +142,7 @@ unquoteQuote = do
     '/' -> branch (lookahead $(char '"')) ('"' <$ $(char '"')) (pure '/')
     x -> pure x
 
+-- | optional separators
 sepP :: Parser e ()
 sepP = token
   $(switch [| case _ of
@@ -109,29 +150,38 @@ sepP = token
     "," -> pure ()
             |])
 
+-- | parse wrapping square brackets
 wrapSquareP :: Parser Error a -> Parser Error a
 wrapSquareP p =
   $(symbol "[") *> p <* $(symbol' "]")
 
+-- | print wrapping square brackets
 wrapSquarePrint :: ByteString -> ByteString
 wrapSquarePrint b = "[" <> b <> "]"
 
+-- | print wrapping quotes
 wrapQuotePrint :: ByteString -> ByteString
 wrapQuotePrint b = "\"" <> b <> "\""
 
-
+-- | parse wrapping square brackets
 wrapCurlyP :: Parser Error a -> Parser Error a
 wrapCurlyP p = $(symbol "{") *> p <* $(symbol' "}")
 
+-- | print wrapping curly brackets
 wrapCurlyPrint :: ByteString -> ByteString
 wrapCurlyPrint b = "{" <> b <> "}"
 
+-- | comma separated Point
 pointP :: Parser Error (Point Double)
 pointP = token $ Point <$> double <*> ($(symbol ",") *> double)
 
+-- | dot curve representation
+--
+-- Assumes the end specification
 curveP :: Parser Error [Point Double]
 curveP = $(symbol "e,") *> many pointP
 
+-- | comma separated rectangle or bounding box
 rectP :: Parser Error (Rect Double)
 rectP = token $ do
   x <- double
@@ -143,8 +193,15 @@ rectP = token $ do
   w <- double
   pure $ Rect x z y w
 
+-- | true | false
 boolP :: Parser Error Bool
 boolP =
   (True <$ $(symbol "true")) <|>
   (False <$ $(symbol "false"))
 
+-- | NonEmpty version of many
+nonEmptyP :: Parser e a -> Parser e () -> Parser e (NonEmpty a)
+nonEmptyP p sep = token $ do
+          s <- p
+          xs <- many (optional sep *> p)
+          pure (s :| xs)

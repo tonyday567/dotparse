@@ -42,7 +42,7 @@ import Optics.Core
 -- >>> runDotParser ex0 :: Graph
 -- Graph {mergeEdges = NoMergeEdges, directed = UnDirected, graphid = Nothing, statements = []}
 --
--- >>> testParserP (Proxy :: Proxy Graph) ex0
+-- >>> testDotParser (Proxy :: Proxy Graph) ex0
 --
 ex0 :: ByteString
 ex0 = encodeUtf8 [trimming|
@@ -51,7 +51,7 @@ graph {}
 
 -- | Examples from https://renenyffenegger.ch/notes/tools/Graphviz/examples/index
 --
--- >>> testParserP (Proxy :: Proxy Graph) ex1
+-- >>> testDotParser (Proxy :: Proxy Graph) ex1
 --
 ex1 :: ByteString
 ex1 = encodeUtf8 [trimming|
@@ -66,7 +66,7 @@ digraph D {
 |]
 
 -- |
--- >>> testParserP (Proxy :: Proxy Graph) ex2
+-- >>> testDotParser (Proxy :: Proxy Graph) ex2
 ex2 :: ByteString
 ex2 = encodeUtf8 [trimming|
 digraph D {
@@ -79,9 +79,8 @@ digraph D {
 }
 |]
 
--- FIXME:
 -- |
--- >>> testParserP (Proxy :: Proxy Graph) ex3
+-- >>> testDotParser (Proxy :: Proxy Graph) ex3
 ex3 :: ByteString
 ex3 = encodeUtf8 [trimming|
 digraph D {
@@ -409,7 +408,7 @@ testAll :: IO ()
 testAll = zipWithM_ (>>)
   (putStrLn <$> ["ex0","ex1","ex2","ex3","ex4","ex5","ex6","ex7"
                 ,"ex8","ex9","ex10","ex11","ex12","ex13","ex14","ex15"])
-  (testParserP (Proxy :: Proxy Graph) <$>
+  (testDotParser (Proxy :: Proxy Graph) <$>
   [ex0,ex1,ex2,ex3,ex4,ex5,ex6,ex7,ex8,ex9,ex10,ex11,ex12,ex13,ex14,ex15])
 
 gInt1 :: G.Graph Int
@@ -426,7 +425,7 @@ gInt1 = G.edges $
 >>> B.putStrLn $ dotPrint g
 digraph {
     graph [bb="0,0,495.65,493.78";overlap=false;size="1!";splines=spline]
-    node [height=0.5;label="\\N";shape=circle]
+    node [height=0.5;label="\N";shape=circle]
     edge [arrowsize=0]
     0 [pos="384.5,475.78";width=0.5]
     1 [pos="357.5,401.63";width=0.5]
@@ -446,11 +445,14 @@ digraph {
     8 [pos="419.5,249.04";width=0.5]
     2 -> 8 [pos="e,406.15,261.18 344.02,313.05 360.71,299.11 388.95,275.54 405.75,261.51"]
     14 [height=0.55967;pos="475.5,249.04";width=0.55967]
-    2 -> 14 [pos="e,459.28,261.56 344.39,313.55 348.48,310.63 353.06,307.61 357.5,305.19 394.93,284.71 408.73,289.04 446.5,269.19 450.64,267.01 454.93,\\\n264.4 458.9,261.81"]
+    2 -> 14 [pos="e,459.28,261.56 344.39,313.55 348.48,310.63 353.06,307.61 357.5,305.19 394.93,284.71 408.73,289.04 446.5,269.19 450.64,267.01 454.93,\
+264.4 458.9,261.81"]
     18 [height=0.55967;pos="239.5,96.445";width=0.55967]
-    2 -> 18 [pos="e,221.18,105.3 313.92,317.87 277.75,302.66 192.9,260.73 166.5,192.89 160,176.2 158.52,168.63 166.5,152.59 177.74,130.02 203.11,114.24 \\\n220.76,105.5"]
+    2 -> 18 [pos="e,221.18,105.3 313.92,317.87 277.75,302.66 192.9,260.73 166.5,192.89 160,176.2 158.52,168.63 166.5,152.59 177.74,130.02 203.11,114.24 \
+220.76,105.5"]
     19 [height=0.55967;pos="335.5,96.445";width=0.55967]
-    2 -> 19 [pos="e,335.94,116.84 331.52,307.33 332.98,282.28 335.56,234 336.5,192.89 336.91,174.98 336.66,170.5 336.5,152.59 336.39,140.81 336.16,\\\n127.62 335.94,117.09"]
+    2 -> 19 [pos="e,335.94,116.84 331.52,307.33 332.98,282.28 335.56,234 336.5,192.89 336.91,174.98 336.66,170.5 336.5,152.59 336.39,140.81 336.16,\
+127.62 335.94,117.09"]
     4 [pos="101.5,172.74";width=0.5]
     3 -> 4 [pos="e,117.56,181.11 247.37,240.64 216.44,226.46 149.09,195.57 117.92,181.27"]
     9 [pos="193.5,172.74";width=0.5]
@@ -463,7 +465,8 @@ digraph {
     4 -> 10 [pos="e,103.72,116.67 102.19,154.51 102.65,143.28 103.24,128.61 103.71,116.95"]
     16 [height=0.55967;pos="162.5,96.445";width=0.55967]
     4 -> 16 [pos="e,150.12,112.52 112.69,158.11 123.2,145.31 138.91,126.18 149.86,112.83"]
-    5 -> 0 [pos="e,366.23,475.02 49.439,114.6 50.887,142.55 53.498,199.64 53.498,248.04 53.498,326.33 53.498,326.33 53.498,326.33 53.498,464.3 295.89,\\\n474.85 365.82,475.02"]
+    5 -> 0 [pos="e,366.23,475.02 49.439,114.6 50.887,142.55 53.498,199.64 53.498,248.04 53.498,326.33 53.498,326.33 53.498,326.33 53.498,464.3 295.89,\
+474.85 365.82,475.02"]
     11 [height=0.54162;pos="19.498,20.148";width=0.54162]
     5 -> 11 [pos="e,26.284,38.534 42.206,79.323 37.545,67.382 31.197,51.119 26.397,38.823"]
     17 [height=0.55967;pos="77.498,20.148";width=0.55967]
