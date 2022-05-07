@@ -16,7 +16,7 @@ import Chart
 import qualified Algebra.Graph.Labelled as L
 import Data.Monoid
 import DotParse
-import Algebra.Graph.ToGraph
+import qualified Algebra.Graph as G
 
 -- $setup
 -- >>> import DotParse
@@ -251,10 +251,18 @@ classesNH =
     Ratio
   ]
 
+dependenciesNH :: [Dependency] -> [Dependency]
+dependenciesNH = filter (\(Dependency x0 x1 _) -> x0 `elem` classesNH && x1 `elem` classesNH)
+
 graphNH :: L.Graph (First Family) Class
 graphNH =
-  L.edges ((\(Dependency x y l) -> (First l,x,y)) <$> dependencies) <>
+  L.edges ((\(Dependency x y l) -> (First l,x,y)) <$> dependenciesNH dependencies) <>
   L.vertices classesNH
+
+graphNHG :: G.Graph Class
+graphNHG =
+  G.edges ((\(Dependency x y _) -> (x,y)) <$> dependenciesNH dependencies) <>
+  G.vertices classesNH
 
 fromFamily :: First Family -> Colour
 fromFamily (First f) = case f of
@@ -264,7 +272,10 @@ fromFamily (First f) = case f of
   Just Actor -> palette1 3
 
 dotGraphNH :: Graph
-dotGraphNH = defaultGraph & #statements %~ (<> toStatements (packUTF8 . show <$> toGraph graphNH))
+dotGraphNH =
+  defaultGraph &
+  #directed .~ Last (Just UnDirected) &
+  addStatements (toStatements (packUTF8 . show <$> graphNHG))
 
 dotGraphNH' :: Graph
 dotGraphNH' = unsafePerformIO $ processGraph dotGraphNH
@@ -272,7 +283,7 @@ dotGraphNH' = unsafePerformIO $ processGraph dotGraphNH
 
 -- |
 --
--- >>> import Chart
--- >>> writeChartSvg "other/nh.svg" nhExample
+-- > import Chart
+-- > writeChartSvg "other/nh.svg" nhExample
 nhExample :: ChartSvg
 nhExample = graphToChart dotGraphNH'

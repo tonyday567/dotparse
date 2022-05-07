@@ -40,7 +40,7 @@ import Optics.Core
 
 -- | minimal definition
 -- >>> runDotParser ex0 :: Graph
--- Graph {mergeEdges = NoMergeEdges, directed = UnDirected, graphid = Nothing, statements = []}
+-- Graph {mergeEdges = Last {getLast = Just NoMergeEdges}, directed = Last {getLast = Just UnDirected}, graphid = Last {getLast = Nothing}, nodeAttributes = fromList [], graphAttributes = fromList [], edgeAttributes = fromList [], nodes = [], edges = [], subgraphs = []}
 --
 -- >>> testDotParser (Proxy :: Proxy Graph) ex0
 --
@@ -479,4 +479,4 @@ digraph {
 
 -}
 exInt :: Graph
-exInt = defaultGraph & #statements %~ (<> toStatements (packUTF8 . show <$> gInt1))
+exInt = defaultGraph & addStatements (toStatements (packUTF8 . show <$> gInt1))
