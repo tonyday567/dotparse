@@ -4,6 +4,8 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use ?~" #-}
 
 -- | Example of Dot graph construction for the NumHask class heirarchy.
 module DotParse.Examples.NumHask where
@@ -271,19 +273,21 @@ fromFamily (First f) = case f of
   Just Multiplication -> palette1 2
   Just Actor -> palette1 3
 
-dotGraphNH :: Graph
-dotGraphNH =
+dotGraphNH :: Directed -> Graph
+dotGraphNH d =
   defaultGraph &
-  #directed .~ Last (Just UnDirected) &
-  addStatements (toStatements (packUTF8 . show <$> graphNHG))
+  #directed .~ Last (Just d) &
+  addStatements (toStatements d (packUTF8 . show <$> graphNHG)) &
+  attL NodeType (ID "shape") .~ Just (ID "box") &
+  gattL (ID "rankdir") .~ Just (IDQuoted "BT")
 
-dotGraphNH' :: Graph
-dotGraphNH' = unsafePerformIO $ processGraph dotGraphNH
+dotGraphNH' :: Directed -> Graph
+dotGraphNH' d = unsafePerformIO $ processGraph (dotGraphNH d)
 {-# NOINLINE dotGraphNH' #-}
 
 -- |
 --
 -- > import Chart
--- > writeChartSvg "other/nh.svg" nhExample
-nhExample :: ChartSvg
-nhExample = graphToChart dotGraphNH'
+-- > writeChartSvg "other/t1.svg" (graphToChart (dotGraphNH' UnDirected))
+nhExample :: Directed -> ChartSvg
+nhExample d = graphToChart (dotGraphNH' d)

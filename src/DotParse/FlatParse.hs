@@ -41,7 +41,8 @@ module DotParse.FlatParse
     wrapCurlyPrint,
     wrapQuotePrint,
     pointP,
-    curveP,
+    Spline (..),
+    splineP,
     rectP,
     boolP,
     nonEmptyP,
@@ -56,6 +57,7 @@ import Prelude hiding (replicate)
 import qualified Data.ByteString.Char8 as B
 import NumHask.Space
 import Data.List.NonEmpty
+import GHC.Generics
 
 -- $setup
 -- >>> import DotParse
@@ -175,11 +177,16 @@ wrapCurlyPrint b = "{" <> b <> "}"
 pointP :: Parser Error (Point Double)
 pointP = token $ Point <$> double <*> ($(symbol ",") *> double)
 
--- | dot curve representation
---
--- Assumes the end specification
-curveP :: Parser Error [Point Double]
-curveP = $(symbol "e,") *> many pointP
+data Spline = Spline { splineEnd :: Maybe (Point Double), splineStart :: Maybe (Point Double), splineP1 :: Point Double, splineTriples :: [(Point Double, Point Double, Point Double)] } deriving (Eq, Show, Generic)
+
+-- |
+-- http://www.graphviz.org/docs/attr-types/splineType/
+splineP :: Parser Error Spline
+splineP = Spline <$>
+  optional ($(symbol "e,") *> pointP) <*>
+  optional ($(symbol "s") *> pointP) <*>
+  pointP <*>
+  some ((,,) <$> pointP <*> pointP <*> pointP)
 
 -- | comma separated rectangle or bounding box
 rectP :: Parser Error (Rect Double)
