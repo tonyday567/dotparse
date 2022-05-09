@@ -18,14 +18,18 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleInstances #-}
-
 -- | Abstract Grammar for the dot language.
 -- http://www.graphviz.org/doc/info/lang.html
 
 module DotParse.Types
- ( DotParse (..),
+ ( DotConfig (..),
+   defaultDotConfig,
+   DotParse (..),
    testDotParser,
    runDotParser,
+
+   Error (..),
+   prettyError,
 
    Graph (..),
    gattL,
@@ -34,7 +38,7 @@ module DotParse.Types
    processDotWith,
    processDot,
    processGraph,
-   graphToChart,
+   processGraphWith,
 
    -- * components
    Strict (..),
@@ -61,7 +65,7 @@ module DotParse.Types
    SubGraphStatement (..),
 
    -- * Graph Extraction
-   bb,
+   bbL,
    nodesPortL,
    nodesL,
    edgesL,
@@ -77,7 +81,8 @@ module DotParse.Types
    edgeInfo,
    splinePath,
 
-   -- * Algebraic.Graph conversion
+   -- * Conversion
+   graphToChart,
    toStatements,
 
  ) where
@@ -87,7 +92,7 @@ import DotParse.FlatParse
 import GHC.Generics
 import NeatInterpolation
 import Data.Text.Encoding (encodeUtf8)
-import Data.ByteString hiding (any, filter, zip, zipWith, putStrLn, map, length, head, empty)
+import Data.ByteString hiding (any, filter, zip, zipWith, map, length, head, empty)
 import Data.Proxy
 import Data.List.NonEmpty hiding (filter, zip, zipWith, map, (!!), length, head)
 import Data.Bool
@@ -105,7 +110,6 @@ import Data.Text (Text)
 import Chart
 import Data.Maybe
 import Data.Map.Merge.Strict
-import qualified Data.Text as Text
 import Data.Monoid
 
 -- $setup
@@ -118,9 +122,20 @@ import Data.Monoid
 -- >>> import qualified Data.Map as Map
 -- >>> :set -XOverloadedStrings
 
+data DotConfig = DotConfig
+  {
+    topLevelSep :: ByteString,
+    statementSep :: ByteString,
+    attSep :: ByteString,
+    subGraphSep :: ByteString
+  } deriving (Eq, Show, Generic)
+
+defaultDotConfig :: DotConfig
+defaultDotConfig = DotConfig " " "\n    " ";" ";"
+
 -- * A parser & printer class for a graphviz graph and components of its dot language
 class DotParse a where
-  dotPrint :: a -> ByteString
+  dotPrint :: DotConfig -> a -> ByteString
   dotParse :: Parser Error a
 
 -- | dotParse and then dotPrint:
@@ -128,14 +143,14 @@ class DotParse a where
 -- - pretty printing error on failure.
 --
 -- - This is not an exact parser/printer, so the test re-parses the dotPrint, which should be idempotent
-testDotParser :: forall a. (DotParse a) => Proxy a -> ByteString -> IO ()
-testDotParser _ b =
+testDotParser :: forall a. (DotParse a) => Proxy a -> DotConfig -> ByteString -> IO ()
+testDotParser _ cfg b =
   case runParser dotParse b :: Result Error a of
     Err e -> B.putStrLn $ prettyError b e
     OK a left -> do
       when (left /= "") (B.putStrLn $ "parsed with leftovers: " <> left)
-      case runParser dotParse (dotPrint a) :: Result Error a of
-        Err e -> B.putStrLn $ "round trip error: " <> prettyError (dotPrint a) e
+      case runParser dotParse (dotPrint cfg a) :: Result Error a of
+        Err e -> B.putStrLn $ "round trip error: " <> prettyError (dotPrint cfg a) e
         Fail -> B.putStrLn "uncaught round trip parse error"
         OK _ left' -> do
           when (left' /= "") (B.putStrLn $ "round trip parse with left overs" <> left)
@@ -144,313 +159,6 @@ testDotParser _ b =
 -- | run a dotParse erroring on leftovers, Fail or Err
 runDotParser :: (DotParse a) => ByteString -> a
 runDotParser = runParser_ dotParse
-
--- * Dot Grammar
--- | MergeEdges (strict)
---
-data Strict = MergeEdges | NoMergeEdges deriving (Eq, Show, Generic)
-
-instance DotParse Strict
-  where
-    dotPrint MergeEdges = "strict"
-    dotPrint NoMergeEdges = ""
-
-    dotParse = token $ optioned $(keyword "strict") (const $ pure MergeEdges) (pure NoMergeEdges)
-
-defStrict :: Last Strict -> Strict
-defStrict (Last Nothing) = NoMergeEdges
-defStrict (Last (Just x)) = x
-
--- | Directed (digraph | graph)
-data Directed = Directed | UnDirected deriving (Eq, Show, Generic)
-
-instance DotParse Directed
-  where
-    dotPrint Directed = "digraph"
-    dotPrint UnDirected = "graph"
-
-    dotParse = token $
-      (Directed <$ $(keyword "digraph")) <|>
-      (UnDirected <$ $(keyword "graph"))
-
-defDirected :: Last Directed -> Directed
-defDirected (Last Nothing) = Directed
-defDirected (Last (Just x)) = x
-
--- |
---
--- >>> runDotParser "0" :: ID
--- IDInt 0
---
--- >>> runDotParser "-.123" :: ID
--- IDDouble (-0.123)
---
--- >>> runParser dotParse "apple_1'" :: Result Error ID
--- OK (ID "apple_1") "'"
---
--- >>> :set -XQuasiQuotes
--- >>> runParser dotParse $ encodeUtf8 [trimming|"hello/""|] :: Result Error ID
--- OK (IDQuoted "hello\"") ""
---
--- >>> runDotParser (encodeUtf8 [trimming|<The <font color='red'><b>foo</b></font>,<br/> the <font point-size='20'>bar</font> and<br/> the <i>baz</i>>|]) :: ID
--- IDHtml "<The <font color='red'><b>foo</b></font>,<br/> the <font point-size='20'>bar</font> and<br/> the <i>baz</i>>"
-data ID = ID ByteString | IDInt Int | IDDouble Double | IDQuoted ByteString | IDHtml ByteString deriving (Eq, Show, Generic, Ord)
-
-instance DotParse ID
-  where
-    dotPrint (ID s) = s
-    dotPrint (IDInt i) = packUTF8 (show i)
-    dotPrint (IDDouble x) = packUTF8 (show x)
-    dotPrint (IDQuoted x) =
-      wrapQuotePrint x
-    dotPrint (IDHtml s) = s
-
-    -- order matters
-    dotParse =
-      (ID <$> ident) <|>
-      (IDInt <$> (signed int `notFollowedBy` $(char '.'))) <|>
-      (IDDouble <$> signed double) <|>
-      (IDQuoted . packUTF8 <$> quoted) <|>
-      (IDHtml . packUTF8 <$> htmlLike)
-
-label :: ID -> String
-label (ID s) = unpackUTF8 s
-label (IDInt i) = show i
-label (IDDouble d) = show d
-label (IDQuoted q) = unpackUTF8 q
-label (IDHtml h) = unpackUTF8 h
-
--- | Attribute key-value pair
---
--- >>> runDotParser "shape=diamond" :: (ID,ID)
--- (ID "shape",ID "diamond")
---
--- >>> runDotParser "fontname=\"Arial\"" :: (ID,ID)
--- (ID "fontname",IDQuoted "Arial")
---
-instance DotParse (ID,ID)
-  where
-    dotPrint (x0,x1) = dotPrint x0 <> "=" <> dotPrint x1
-
-    dotParse = token $
-      do
-        x0 <- token dotParse
-        _ <- token $(symbol "=")
-        x1 <- dotParse
-        pure (x0,x1)
-
--- | Attribute collections
---
--- >>> runDotParser "[shape=diamond; color=blue] [label=label]" :: Map.Map ID ID
--- fromList [(ID "color",ID "blue"),(ID "label",ID "label"),(ID "shape",ID "diamond")]
---
--- A given entity can have multiple attribute lists. For simplicity, these are mconcat'ed on parsing.
---
-instance DotParse (Map.Map ID ID)
-  where
-    dotPrint as =
-      bool
-      (wrapSquarePrint (intercalate ";" $ dotPrint <$> Map.toList as))
-      mempty
-      (as == Map.empty)
-
-    dotParse =
-      Map.fromList . mconcat . fmap toList <$>
-      token (many (wrapSquareP (nonEmptyP dotParse sepP)) <|> ([] <$ wrapSquareP ws))
-
-data Compass = CompassN | CompassNE | CompassE | CompassSE | CompassS | CompassSW | CompassW | CompassNW | CompassC | Compass_ deriving (Eq, Show, Generic)
-
-instance DotParse Compass
-  where
-    dotPrint CompassN = "n"
-    dotPrint CompassNE = "ne"
-    dotPrint CompassE = "e"
-    dotPrint CompassSE = "se"
-    dotPrint CompassS = "s"
-    dotPrint CompassSW = "sw"
-    dotPrint CompassW = "w"
-    dotPrint CompassNW = "nw"
-    dotPrint CompassC = "c"
-    dotPrint Compass_ = "_"
-
-    dotParse = token
-      $(switch [| case _ of
-                   "n"  -> pure CompassN
-                   "ne"  -> pure CompassNE
-                   "e"  -> pure CompassE
-                   "se"  -> pure CompassSE
-                   "s"  -> pure CompassS
-                   "sw"  -> pure CompassSW
-                   "w"  -> pure CompassW
-                   "nw"  -> pure CompassNW
-                   "c"  -> pure CompassC
-                   "_" -> pure Compass_
-                |])
-
-
-newtype Port = Port { portID :: These ID Compass } deriving (Eq, Show, Generic)
-
-instance DotParse Port
-  where
-    dotPrint (Port (This i)) = ": " <> dotPrint i
-    dotPrint (Port (That c)) = ": " <> dotPrint c
-    dotPrint (Port (These i c)) = ": " <> dotPrint i <> " : " <> dotPrint c
-
-    dotParse = token $
-      ((\x0 x1 -> Port (These x0 x1)) <$> ($(symbol ":") *> dotParse) <*> ($(symbol ":") *> dotParse)) <|>
-      (Port . This <$> ($(symbol ":") *> dotParse)) <|>
-      (Port . That <$> ($(symbol ":") *> dotParse))
-
--- |
-newtype GlobalAttributeStatement = GlobalAttributeStatement { globalAttributeStatement :: (ID, ID) } deriving (Eq, Show, Generic)
-
-instance DotParse GlobalAttributeStatement
-  where
-    dotPrint (GlobalAttributeStatement s) = dotPrint s
-    dotParse = GlobalAttributeStatement <$> dotParse
-
-data AttributeType = GraphType | NodeType | EdgeType deriving (Eq, Show, Generic)
-
-instance DotParse AttributeType
-  where
-    dotPrint GraphType = "graph"
-    dotPrint NodeType = "node"
-    dotPrint EdgeType = "edge"
-
-    dotParse = token
-      (GraphType <$ $(keyword "graph")) <|>
-      (NodeType <$ $(keyword "node")) <|>
-      (EdgeType <$ $(keyword "edge"))
-
--- |
-data AttributeStatement = AttributeStatement { attributeType :: AttributeType, globals :: Map.Map ID ID } deriving (Eq, Show, Generic)
-
-instance DotParse AttributeStatement
-  where
-    dotPrint (AttributeStatement t as) =
-      intercalate " "
-      [dotPrint t, dotPrint as]
-
-    dotParse = AttributeStatement <$> dotParse <*> dotParse
-
--- |
--- >>> runDotParser "A [shape=diamond; color=blue]" :: Statement
--- StatementNode (NodeStatement {nodeID = ID "A", port = Nothing, nodeAttrs = fromList [(ID "color",ID "blue"),(ID "shape",ID "diamond")]})
-data NodeStatement = NodeStatement { nodeID :: ID, port :: Maybe Port, nodeAttrs :: Map.Map ID ID } deriving (Eq, Show, Generic)
-
-instance DotParse NodeStatement
-  where
-    dotPrint (NodeStatement i p as) =
-      intercalate " " $
-      [dotPrint i] <>
-      (dotPrint <$> maybeToList p) <>
-      [dotPrint as]
-
-    dotParse = NodeStatement <$> dotParse <*> optional dotParse <*> dotParse
-
--- |
-data EdgeID =
-  EdgeID ID (Maybe Port) |
-  AnonymousEdge SubGraphStatement
-  deriving (Eq, Show, Generic)
-
-instance DotParse EdgeID
-  where
-    dotPrint (EdgeID e p) =
-      mconcat $ [dotPrint e] <> (dotPrint <$> maybeToList p)
-    dotPrint (AnonymousEdge s) = dotPrint s
-
-    dotParse =
-      (EdgeID <$> dotParse <*> optional dotParse) <|>
-      (AnonymousEdge <$> dotParse)
-
--- | An edgeop is -> in directed graphs and -- in undirected graphs.
-data EdgeOp = EdgeDirected | EdgeUndirected deriving (Eq, Show, Generic)
-
-instance DotParse EdgeOp
-  where
-    dotPrint EdgeDirected = "->"
-    dotPrint EdgeUndirected = "--"
-
-    dotParse = token
-      $(switch [| case _ of
-                   "->"  -> pure EdgeDirected
-                   "--" -> pure EdgeUndirected
-                |])
-
-fromDirected :: Directed -> EdgeOp
-fromDirected Directed = EdgeDirected
-fromDirected UnDirected = EdgeUndirected
-
--- |
--- >>> runDotParser "A -> B [style=dashed, color=grey]" :: EdgeStatement
--- EdgeStatement {edgeOp = EdgeDirected, leftEdge = EdgeID (ID "A") Nothing, rightEdges = EdgeID (ID "B") Nothing :| [], edgeAttrs = fromList [(ID "color",ID "grey"),(ID "style",ID "dashed")]}
---
-data EdgeStatement = EdgeStatement { edgeOp :: EdgeOp, leftEdge :: EdgeID, rightEdges :: NonEmpty EdgeID, edgeAttrs :: Map.Map ID ID } deriving (Eq, Show, Generic)
-
-instance DotParse EdgeStatement
-  where
-    dotPrint (EdgeStatement l rs xs as) =
-      intercalate " "
-      ([intercalate (" " <> dotPrint l <> " ") (dotPrint <$> (rs:toList xs))] <>
-       [dotPrint as])
-
-    dotParse = token $ do
-      l <- dotParse
-      o0 <- dotParse
-      r0 <- dotParse
-      ors <- many ((,) <$> dotParse <*> dotParse)
-      as <- dotParse
-      bool
-        (pure (EdgeStatement o0 l (r0:| (snd <$> ors)) as))
-        empty
-        (any ((/= o0) . fst) ors)
-
-edgeID :: EdgeID -> Maybe ID
-edgeID (EdgeID i _) = Just i
-edgeID (AnonymousEdge (SubGraphStatement i _)) = i
-
-edgeIDsNamed :: EdgeStatement -> [(ID, ID)]
-edgeIDsNamed e = [(x,y) | (Just x, Just y) <- edgeIDs e]
-
-edgeIDs :: EdgeStatement -> [(Maybe ID,Maybe ID)]
-edgeIDs e = zip (id0:id1) id1
-  where
-    id0 = edgeID (view #leftEdge e)
-    id1 = edgeID <$> toList (view #rightEdges e)
-
--- each subgraph must have a unique name
-data SubGraphStatement = SubGraphStatement { subgraphID :: Maybe ID, subgraphStatements :: [Statement] } deriving (Eq, Show, Generic)
-
-instance DotParse SubGraphStatement
-  where
-    dotPrint (SubGraphStatement x xs) =
-      intercalate " " $
-      maybe []
-      (\x' -> [intercalate " " ["subgraph", dotPrint x']]) x <>
-      (:[]) (wrapCurlyPrint (intercalate "\n    " $ dotPrint <$> xs))
-
-    dotParse = token $ do
-      x <- optional ($(keyword "subgraph") *> dotParse)
-      pure (SubGraphStatement x) <*> wrapCurlyP (many (optional sepP *> dotParse))
-
-data Statement = StatementNode NodeStatement | StatementEdge EdgeStatement | StatementGlobalAttribute GlobalAttributeStatement | StatementAttribute AttributeStatement | StatementSubGraph SubGraphStatement deriving (Eq, Show, Generic)
-
-instance DotParse Statement
-  where
-    dotPrint (StatementNode x) = dotPrint x
-    dotPrint (StatementEdge x) = dotPrint x
-    dotPrint (StatementAttribute x) = dotPrint x
-    dotPrint (StatementGlobalAttribute x) = dotPrint x
-    dotPrint (StatementSubGraph x) = dotPrint x
-
-    dotParse = token (
-      -- Order is important
-      (StatementEdge <$> dotParse) <|>
-      (StatementAttribute <$> dotParse) <|>
-      (StatementNode <$> dotParse) <|>
-      (StatementSubGraph <$> dotParse) <|>
-      (StatementGlobalAttribute <$> dotParse))
 
 -- | Representation of a full graphviz graph, as per the dot language specification
 data Graph =
@@ -476,22 +184,16 @@ instance Monoid Graph
   where
     mempty = Graph mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty
 
+
+-- | global attributes lens
 gattL :: ID -> Lens' Graph (Maybe ID)
 gattL k = #globalAttributes % at k
 
+-- | attributes lens
 attL :: AttributeType -> ID -> Lens' Graph (Maybe ID)
-attL a k = lens (lookupAtt_ a k) (alterAtt_ a k)
-
--- FIXME:
-lookupAtt_ :: AttributeType -> ID -> Graph -> Maybe ID
-lookupAtt_ GraphType k g = graphAttributes g ^. at k
-lookupAtt_ NodeType k g = nodeAttributes g ^. at k
-lookupAtt_ EdgeType k g = edgeAttributes g ^. at k
-
-alterAtt_ :: AttributeType -> ID -> Graph -> Maybe ID -> Graph
-alterAtt_ GraphType k g v = g & #graphAttributes %~ (at k .~ v)
-alterAtt_ NodeType k g v = g & #nodeAttributes %~ (at k .~ v)
-alterAtt_ EdgeType k g v = g & #edgeAttributes %~ (at k .~ v)
+attL GraphType k = #graphAttributes % at k
+attL NodeType k = #nodeAttributes % at k
+attL EdgeType k = #edgeAttributes % at k
 
 outercalate :: ByteString -> [ByteString] -> ByteString
 outercalate _ [] = mempty
@@ -499,19 +201,19 @@ outercalate a xs = a <> intercalate a xs <> a
 
 instance DotParse Graph
   where
-    dotPrint (Graph me d i na ga ea gs ns es ss) =
-      intercalate " " $
+    dotPrint cfg (Graph me d i na ga ea gs ns es ss) =
+      intercalate (cfg ^. #topLevelSep) $
       bool [] ["strict"] (me == Last (Just MergeEdges)) <>
       bool ["digraph"] ["graph"] (d == Last (Just UnDirected)) <>
-      maybe [] ((:[]) . dotPrint) (getLast i) <>
-      [wrapCurlyPrint $ outercalate "\n    "
-       ( [dotPrint (AttributeStatement NodeType na)] <>
-         [dotPrint (AttributeStatement GraphType ga)] <>
-         [dotPrint (AttributeStatement EdgeType ea)] <>
-         (dotPrint . GlobalAttributeStatement <$> Map.toList gs) <>
-         (dotPrint <$> ns) <>
-         (dotPrint <$> es) <>
-         (dotPrint <$> ss))
+      maybe [] ((:[]) . dotPrint cfg) (getLast i) <>
+      [wrapCurlyPrint $ outercalate (cfg ^. #statementSep)
+       ( [dotPrint cfg (AttributeStatement NodeType na)] <>
+         [dotPrint cfg (AttributeStatement GraphType ga)] <>
+         [dotPrint cfg (AttributeStatement EdgeType ea)] <>
+         (dotPrint cfg . GlobalAttributeStatement <$> Map.toList gs) <>
+         (dotPrint cfg <$> ns) <>
+         (dotPrint cfg <$> es) <>
+         (dotPrint cfg <$> ss))
       ]
 
     dotParse = token $ do
@@ -526,6 +228,342 @@ instance DotParse Graph
             #graphid .~ Last i
       pure $ addStatements ss g
 
+-- * Dot Grammar
+-- | MergeEdges (strict)
+--
+data Strict = MergeEdges | NoMergeEdges deriving (Eq, Show, Generic)
+
+instance DotParse Strict
+  where
+    dotPrint _ MergeEdges = "strict"
+    dotPrint _ NoMergeEdges = ""
+
+    dotParse = token $ optioned $(keyword "strict") (const $ pure MergeEdges) (pure NoMergeEdges)
+
+-- | Default Strict is NoMergeEdges
+defStrict :: Last Strict -> Strict
+defStrict (Last Nothing) = NoMergeEdges
+defStrict (Last (Just x)) = x
+
+-- | Directed (digraph | graph)
+data Directed = Directed | UnDirected deriving (Eq, Show, Generic)
+
+instance DotParse Directed
+  where
+    dotPrint _ Directed = "digraph"
+    dotPrint _ UnDirected = "graph"
+
+    dotParse = token $
+      (Directed <$ $(keyword "digraph")) <|>
+      (UnDirected <$ $(keyword "graph"))
+
+-- | Default Directed is Directed
+defDirected :: Last Directed -> Directed
+defDirected (Last Nothing) = Directed
+defDirected (Last (Just x)) = x
+
+-- | A dot statement as per the dot language specification.
+data Statement = StatementNode NodeStatement | StatementEdge EdgeStatement | StatementGlobalAttribute GlobalAttributeStatement | StatementAttribute AttributeStatement | StatementSubGraph SubGraphStatement deriving (Eq, Show, Generic)
+
+instance DotParse Statement
+  where
+    dotPrint cfg (StatementNode x) = dotPrint cfg x
+    dotPrint cfg (StatementEdge x) = dotPrint cfg x
+    dotPrint cfg (StatementAttribute x) = dotPrint cfg x
+    dotPrint cfg (StatementGlobalAttribute x) = dotPrint cfg x
+    dotPrint cfg (StatementSubGraph x) = dotPrint cfg x
+
+    dotParse = token $
+      -- Order is important
+      (StatementEdge <$> dotParse) <|>
+      (StatementAttribute <$> dotParse) <|>
+      (StatementGlobalAttribute <$> dotParse) <|>
+      (StatementSubGraph <$> dotParse) <|>
+      (StatementNode <$> dotParse)
+
+-- | Identifier as per the dot language specifications.
+--
+-- >>> runDotParser "0" :: ID
+-- IDInt 0
+--
+-- >>> runDotParser "-.123" :: ID
+-- IDDouble (-0.123)
+--
+-- >>> runParser dotParse "apple_1'" :: Result Error ID
+-- OK (ID "apple_1") "'"
+--
+-- >>> :set -XQuasiQuotes
+-- >>> runParser dotParse $ encodeUtf8 [trimming|"hello/""|] :: Result Error ID
+-- OK (IDQuoted "hello\"") ""
+--
+-- >>> runDotParser (encodeUtf8 [trimming|<The <font color='red'><b>foo</b></font>,<br/> the <font point-size='20'>bar</font> and<br/> the <i>baz</i>>|]) :: ID
+-- IDHtml "<The <font color='red'><b>foo</b></font>,<br/> the <font point-size='20'>bar</font> and<br/> the <i>baz</i>>"
+data ID = ID ByteString | IDInt Int | IDDouble Double | IDQuoted ByteString | IDHtml ByteString deriving (Eq, Show, Generic, Ord)
+
+instance DotParse ID
+  where
+    dotPrint _ (ID s) = s
+    dotPrint _ (IDInt i) = packUTF8 (show i)
+    dotPrint _ (IDDouble x) = packUTF8 (show x)
+    dotPrint _ (IDQuoted x) =
+      wrapQuotePrint x
+    dotPrint _ (IDHtml s) = s
+
+    -- order matters
+    dotParse =
+      (ID <$> ident) <|>
+      (IDInt <$> (signed int `notFollowedBy` $(char '.'))) <|>
+      (IDDouble <$> signed double) <|>
+      (IDQuoted . packUTF8 <$> quoted) <|>
+      (IDHtml . packUTF8 <$> htmlLike)
+
+-- | ID as the equivalent plain String
+--
+-- note that the dot language identifier equivalence law is:
+--
+-- > x == y if label x == label y
+--
+label :: ID -> String
+label (ID s) = unpackUTF8 s
+label (IDInt i) = show i
+label (IDDouble d) = show d
+label (IDQuoted q) = unpackUTF8 q
+label (IDHtml h) = unpackUTF8 h
+
+-- | Attribute key-value pair of identifiers
+--
+-- >>> runDotParser "shape=diamond" :: (ID,ID)
+-- (ID "shape",ID "diamond")
+--
+-- >>> runDotParser "fontname=\"Arial\"" :: (ID,ID)
+-- (ID "fontname",IDQuoted "Arial")
+--
+instance DotParse (ID,ID)
+  where
+    dotPrint cfg (x0,x1) = dotPrint cfg x0 <> "=" <> dotPrint cfg x1
+
+    dotParse = token $
+      do
+        x0 <- token dotParse
+        _ <- token $(symbol "=")
+        x1 <- dotParse
+        pure (x0,x1)
+
+-- | Attribute collections
+--
+-- >>> runDotParser "[shape=diamond; color=blue] [label=label]" :: Map.Map ID ID
+-- fromList [(ID "color",ID "blue"),(ID "label",ID "label"),(ID "shape",ID "diamond")]
+--
+-- A given entity can have multiple attribute lists. For simplicity, these are mconcat'ed on parsing.
+--
+instance DotParse (Map.Map ID ID)
+  where
+    dotPrint cfg as =
+      bool
+      (wrapSquarePrint (intercalate (cfg ^. #attSep) $ dotPrint cfg <$> Map.toList as))
+      mempty
+      (as == Map.empty)
+
+    dotParse =
+      Map.fromList . mconcat . fmap toList <$>
+      token (many (wrapSquareP (nonEmptyP dotParse sepP)) <|> ([] <$ wrapSquareP ws))
+
+-- | Compass instructions which are optionally associated with an identifier
+data Compass = CompassN | CompassNE | CompassE | CompassSE | CompassS | CompassSW | CompassW | CompassNW | CompassC | Compass_ deriving (Eq, Show, Generic)
+
+instance DotParse Compass
+  where
+    dotPrint _ CompassN = "n"
+    dotPrint _ CompassNE = "ne"
+    dotPrint _ CompassE = "e"
+    dotPrint _ CompassSE = "se"
+    dotPrint _ CompassS = "s"
+    dotPrint _ CompassSW = "sw"
+    dotPrint _ CompassW = "w"
+    dotPrint _ CompassNW = "nw"
+    dotPrint _ CompassC = "c"
+    dotPrint _ Compass_ = "_"
+
+    dotParse = token
+      $(switch [| case _ of
+                   "n"  -> pure CompassN
+                   "ne"  -> pure CompassNE
+                   "e"  -> pure CompassE
+                   "se"  -> pure CompassSE
+                   "s"  -> pure CompassS
+                   "sw"  -> pure CompassSW
+                   "w"  -> pure CompassW
+                   "nw"  -> pure CompassNW
+                   "c"  -> pure CompassC
+                   "_" -> pure Compass_
+                |])
+
+
+-- | Port instructions which are optionally associated with an identifier
+newtype Port = Port { portID :: These ID Compass } deriving (Eq, Show, Generic)
+
+instance DotParse Port
+  where
+    dotPrint cfg (Port (This i)) = ": " <> dotPrint cfg i
+    dotPrint cfg (Port (That c)) = ": " <> dotPrint cfg c
+    dotPrint cfg (Port (These i c)) = ": " <> dotPrint cfg i <> " : " <> dotPrint cfg c
+
+    dotParse = token $
+      ((\x0 x1 -> Port (These x0 x1)) <$> ($(symbol ":") *> dotParse) <*> ($(symbol ":") *> dotParse)) <|>
+      (Port . This <$> ($(symbol ":") *> dotParse)) <|>
+      (Port . That <$> ($(symbol ":") *> dotParse))
+
+-- | A top-level attribute
+--
+-- >>> runDotParser "rankdir=\"BT\"" :: Statement
+-- StatementGlobalAttribute (GlobalAttributeStatement {globalAttributeStatement = (ID "rankdir",IDQuoted "BT")})
+newtype GlobalAttributeStatement = GlobalAttributeStatement { globalAttributeStatement :: (ID, ID) } deriving (Eq, Show, Generic)
+
+instance DotParse GlobalAttributeStatement
+  where
+    dotPrint cfg (GlobalAttributeStatement s) = dotPrint cfg s
+    dotParse = GlobalAttributeStatement <$> dotParse
+
+-- | Category of attribute
+data AttributeType = GraphType | NodeType | EdgeType deriving (Eq, Show, Generic)
+
+instance DotParse AttributeType
+  where
+    dotPrint _ GraphType = "graph"
+    dotPrint _ NodeType = "node"
+    dotPrint _ EdgeType = "edge"
+
+    dotParse = token
+      (GraphType <$ $(keyword "graph")) <|>
+      (NodeType <$ $(keyword "node")) <|>
+      (EdgeType <$ $(keyword "edge"))
+
+-- | Top-level attribute statement
+--
+-- >>> runDotParser "graph [overlap=false, splines=spline, size=\"1!\"];" :: Statement
+-- StatementAttribute (AttributeStatement {attributeType = GraphType, attributes = fromList [(ID "overlap",ID "false"),(ID "size",IDQuoted "1!"),(ID "splines",ID "spline")]})
+data AttributeStatement = AttributeStatement { attributeType :: AttributeType, attributes :: Map.Map ID ID } deriving (Eq, Show, Generic)
+
+instance DotParse AttributeStatement
+  where
+    dotPrint cfg (AttributeStatement t as) =
+      intercalate " "
+      [dotPrint cfg t, dotPrint cfg as]
+
+    dotParse = AttributeStatement <$> dotParse <*> dotParse
+
+-- | Node statement
+--
+-- >>> runDotParser "A [shape=diamond; color=blue]" :: Statement
+-- StatementNode (NodeStatement {nodeID = ID "A", port = Nothing, nodeAttrs = fromList [(ID "color",ID "blue"),(ID "shape",ID "diamond")]})
+data NodeStatement = NodeStatement { nodeID :: ID, port :: Maybe Port, nodeAttrs :: Map.Map ID ID } deriving (Eq, Show, Generic)
+
+instance DotParse NodeStatement
+  where
+    dotPrint cfg (NodeStatement i p as) =
+      intercalate " " $
+      [dotPrint cfg i] <>
+      (dotPrint cfg <$> maybeToList p) <>
+      [dotPrint cfg as]
+
+    dotParse = NodeStatement <$> dotParse <*> optional dotParse <*> dotParse
+
+-- | An edge can be specified in as a NodeID or as a SubGraph
+data EdgeID =
+  EdgeID ID (Maybe Port) |
+  EdgeSubGraph SubGraphStatement
+  deriving (Eq, Show, Generic)
+
+instance DotParse EdgeID
+  where
+    dotPrint cfg (EdgeID e p) =
+      mconcat $ [dotPrint cfg e] <> (dotPrint cfg <$> maybeToList p)
+    dotPrint cfg (EdgeSubGraph s) = dotPrint cfg s
+
+    dotParse =
+      (EdgeID <$> dotParse <*> optional dotParse) <|>
+      (EdgeSubGraph <$> dotParse)
+
+-- | An edgeop is -> in directed graphs and -- in undirected graphs.
+data EdgeOp = EdgeDirected | EdgeUndirected deriving (Eq, Show, Generic)
+
+instance DotParse EdgeOp
+  where
+    dotPrint _ EdgeDirected = "->"
+    dotPrint _ EdgeUndirected = "--"
+
+    dotParse = token
+      $(switch [| case _ of
+                   "->"  -> pure EdgeDirected
+                   "--" -> pure EdgeUndirected
+                |])
+
+-- | generate an EdgeOp given the type of graph.
+fromDirected :: Directed -> EdgeOp
+fromDirected Directed = EdgeDirected
+fromDirected UnDirected = EdgeUndirected
+
+-- | Edge statement
+--
+-- >>> runDotParser "A -> B [style=dashed, color=grey]" :: Statement
+-- StatementEdge (EdgeStatement {edgeOp = EdgeDirected, leftEdge = EdgeID (ID "A") Nothing, rightEdges = EdgeID (ID "B") Nothing :| [], edgeAttrs = fromList [(ID "color",ID "grey"),(ID "style",ID "dashed")]})
+--
+data EdgeStatement = EdgeStatement { edgeOp :: EdgeOp, leftEdge :: EdgeID, rightEdges :: NonEmpty EdgeID, edgeAttrs :: Map.Map ID ID } deriving (Eq, Show, Generic)
+
+instance DotParse EdgeStatement
+  where
+    dotPrint cfg (EdgeStatement l rs xs as) =
+      intercalate " "
+      ([intercalate (" " <> dotPrint cfg l <> " ") (dotPrint cfg <$> (rs:toList xs))] <>
+       [dotPrint cfg as])
+
+    dotParse = token $ do
+      l <- dotParse
+      o0 <- dotParse
+      r0 <- dotParse
+      ors <- many ((,) <$> dotParse <*> dotParse)
+      as <- dotParse
+      bool
+        (pure (EdgeStatement o0 l (r0:| (snd <$> ors)) as))
+        empty
+        (any ((/= o0) . fst) ors)
+
+-- | The edge ID or subgraph ID (if any)
+edgeID :: EdgeID -> Maybe ID
+edgeID (EdgeID i _) = Just i
+edgeID (EdgeSubGraph (SubGraphStatement i _)) = i
+
+-- | edge IDs
+edgeIDsNamed :: EdgeStatement -> [(ID, ID)]
+edgeIDsNamed e = [(x,y) | (Just x, Just y) <- edgeIDs e]
+
+-- | list of edges in a given EdgeStatement, including anonymous SugGraphs
+edgeIDs :: EdgeStatement -> [(Maybe ID,Maybe ID)]
+edgeIDs e = zip (id0:id1) id1
+  where
+    id0 = edgeID (view #leftEdge e)
+    id1 = edgeID <$> toList (view #rightEdges e)
+
+-- | A subgraph statement.
+--
+-- Note: each subgraph must have a unique name
+--
+-- >>> runDotParser "subgraph A {A, B, C}" :: Statement
+-- StatementSubGraph (SubGraphStatement {subgraphID = Just (ID "A"), subgraphStatements = [StatementNode (NodeStatement {nodeID = ID "A", port = Nothing, nodeAttrs = fromList []}),StatementNode (NodeStatement {nodeID = ID "B", port = Nothing, nodeAttrs = fromList []}),StatementNode (NodeStatement {nodeID = ID "C", port = Nothing, nodeAttrs = fromList []})]})
+data SubGraphStatement = SubGraphStatement { subgraphID :: Maybe ID, subgraphStatements :: [Statement] } deriving (Eq, Show, Generic)
+
+instance DotParse SubGraphStatement
+  where
+    dotPrint cfg (SubGraphStatement x xs) =
+      intercalate " " $
+      maybe []
+      (\x' -> [intercalate " " ["subgraph", dotPrint cfg x']]) x <>
+      (:[]) (wrapCurlyPrint (intercalate (cfg ^. #subGraphSep) $ dotPrint cfg <$> xs))
+
+    dotParse = token $ do
+      x <- optional ($(keyword "subgraph") *> dotParse)
+      pure (SubGraphStatement x) <*> wrapCurlyP (many (optional sepP *> dotParse))
+
 addStatement :: Statement -> Graph -> Graph
 addStatement (StatementNode n) g = g & #nodes %~ (<>[n])
 addStatement (StatementEdge e) g = g & #edges %~ (<>[e])
@@ -538,6 +576,8 @@ addStatement (StatementGlobalAttribute (GlobalAttributeStatement s)) g = g & #gl
 addStatements :: [Statement] -> Graph -> Graph
 addStatements ss g = Prelude.foldr addStatement g ss
 
+-- | default dot graph as a ByteString
+--
 defaultBS :: ByteString
 defaultBS = encodeUtf8 [trimming|
 digraph {
@@ -550,6 +590,15 @@ digraph {
   }
 |]
 
+-- | A default dot graph
+--
+-- >>> import qualified Data.ByteString.Char8 as B
+-- >>> B.putStrLn $ dotPrint defaultDotConfig defaultGraph
+-- digraph {
+--     node [height=0.5;shape=circle]
+--     graph [overlap=false;size="1!";splines=spline]
+--     edge [arrowsize=0]
+--     }
 defaultGraph :: Graph
 defaultGraph = runDotParser defaultBS
 
@@ -570,33 +619,48 @@ processDot :: Directed -> ByteString -> IO ByteString
 processDot d = processDotWith d ["-Tdot"]
 
 -- | Augment a Graph via the graphviz process
+processGraphWith :: DotConfig -> Graph -> IO Graph
+processGraphWith cfg g =
+  runDotParser <$> processDot (defDirected $ view #directed g) (dotPrint cfg g)
+
+-- | Augment a Graph via the graphviz process
 processGraph :: Graph -> IO Graph
 processGraph g =
-  runDotParser <$> processDot (defDirected $ view #directed g) (dotPrint g)
+  runDotParser <$> processDot (defDirected $ view #directed g) (dotPrint defaultDotConfig g)
 
--- * Bounding Box
+instance DotParse (Point Double)
+  where
+    dotPrint _ (Point x y) =
+      intercalate "," $
+      packUTF8 . show <$> [x, y]
 
---
+    dotParse = token pointP
+
+pointI :: Iso' ID (Point Double)
+pointI = iso
+    (runParser_ pointP . packUTF8 . label)
+    (IDQuoted . dotPrint defaultDotConfig)
+
 instance DotParse (Rect Double)
   where
-    dotPrint (Rect x z y w) =
+    dotPrint _ (Rect x z y w) =
       intercalate "," $
       packUTF8 . show <$> [x, y, z, w]
 
     dotParse = token rectP
 
-bb :: Lens' Graph (Maybe (Rect Double))
-bb = lens lookupbb_ alterbb_
+rectI :: Iso' ID (Rect Double)
+rectI = iso
+    (runParser_ rectP . packUTF8 . label)
+    (IDQuoted . dotPrint defaultDotConfig)
 
-alterbb_ :: Graph -> Maybe (Rect Double) -> Graph
-alterbb_ g r =
-  g &
-  #graphAttributes %~ (at (ID "bb") .~ (IDQuoted . dotPrint <$> r))
+-- | Bounding box ID lens
+bb_ :: Lens' Graph (Maybe ID)
+bb_ = #graphAttributes % at (ID "bb")
 
-lookupbb_ :: Graph -> Maybe (Rect Double)
-lookupbb_ g = case runParser rectP . packUTF8 . label <$> view (attL GraphType (ID "bb")) g of
-  Just (OK r _) -> Just r
-  _ -> Nothing
+-- | Bounding Box lens as a 'Rect'
+bbL :: Lens' Graph (Maybe (Rect Double))
+bbL = lens (preview (bb_ % _Just % rectI)) (\g r -> set bb_ (review rectI <$> r) g)
 
 -- | nodes lens
 nodesPortL :: Lens' Graph (Map.Map ID (Maybe Port, Map.Map ID ID))
@@ -612,21 +676,21 @@ nodesL =
          fmap (\x -> (view #nodeID x, view #nodeAttrs x)) & Map.fromList)
   (\g m -> g & #nodes .~ ((\(n,a) -> NodeStatement n Nothing a) <$> Map.toList m))
 
--- | nodes lens ignoring/forgetting port information
+-- | edges lens ignoring/forgetting port information
 edgesL :: Lens' Graph (Map.Map (ID,ID) (Map.Map ID ID))
 edgesL =
-  lens edges' newEdges_
+  lens getEdges_ setEdges_
 
 -- | edge & attribute map
 -- ignores anonymous subgraphs
-edges' :: Graph -> Map.Map (ID, ID) (Map.Map ID ID)
-edges' g =
+getEdges_ :: Graph -> Map.Map (ID, ID) (Map.Map ID ID)
+getEdges_ g =
   Map.fromList $
   mconcat $ fmap (\(xs, a) -> (,a) <$> xs)
   [(edgeIDsNamed e, view #edgeAttrs e) | e <- view #edges g]
 
-newEdges_ :: Graph -> Map.Map (ID, ID) (Map.Map ID ID) -> Graph
-newEdges_ g m =
+setEdges_ :: Graph -> Map.Map (ID, ID) (Map.Map ID ID) -> Graph
+setEdges_ g m =
   g &
   #edges .~
   ((\((x0,x1),as) ->
@@ -636,30 +700,28 @@ newEdges_ g m =
       (EdgeID x1 Nothing:|[]) as) <$>
     Map.toList m)
 
--- | A specific attribute for all nodes in a grpah
-nodesA :: Graph -> ID -> Map.Map ID (Maybe ID)
-nodesA g a = fmap (Map.lookup a) (view nodesL g)
-
--- | edge attribute lookup
-edgesA :: Graph -> ID -> Map.Map (ID,ID) (Maybe ID)
-edgesA g a = fmap (Map.lookup a) (edges' g)
+-- | A specific attribute for all nodes in a graph
+nodesA :: ID -> Graph -> Map.Map ID (Maybe ID)
+nodesA a g = fmap (Map.lookup a) (view nodesL g)
 
 -- | node position (as a Point)
 nodePos :: Graph -> Map.Map ID (Maybe (Point Double))
-nodePos g =
-  fmap
-  (\case
-      (Just (IDQuoted x')) -> Just (runParser_ pointP x')
-      _ -> Nothing) $
-  nodesA g (ID "pos")
+nodePos = fmap (fmap (view pointI)) . nodesA (ID "pos")
 
+--
+-- | Specific attribute for all edges
+edgesA :: Graph -> ID -> Map.Map (ID,ID) (Maybe ID)
+edgesA g a = fmap (Map.lookup a) (view edgesL g)
+
+-- | node width attributes
 nodeWidth :: Graph -> Map.Map ID (Maybe Double)
 nodeWidth g =
   fmap (\case
            Just (IDDouble x') -> Just x'
            _ -> Nothing) $
-  nodesA g (ID "width")
+  nodesA (ID "width") g
 
+-- | edge width attributes
 edgeWidth :: Graph -> Map.Map (ID, ID) (Maybe Double)
 edgeWidth g =
   fmap (\case
@@ -667,6 +729,7 @@ edgeWidth g =
            _ -> Nothing) $
   edgesA g (ID "width")
 
+-- | edge path attributes
 edgeSpline :: Graph -> Map.Map (ID, ID) (Maybe Spline)
 edgeSpline g =
   fmap (\case
@@ -674,10 +737,10 @@ edgeSpline g =
            _ -> Nothing) $
   edgesA g (ID "pos")
 
-data NodeInfo = NodeInfo { nlabel :: Text, nwidth :: Double, pos :: Point Double } deriving (Eq, Show, Generic)
+data NodeInfo = NodeInfo { nlabel :: ID, nwidth :: Double, pos :: Point Double } deriving (Eq, Show, Generic)
 
 nodeInfo :: Graph -> Double -> [NodeInfo]
-nodeInfo g w = [NodeInfo (Text.pack $ label x) (fromMaybe w (join w')) p | (x, (Just p, w')) <- xs]
+nodeInfo g w = [NodeInfo x (fromMaybe w (join w')) p | (x, (Just p, w')) <- xs]
   where
     xs = Map.toList $
          merge
@@ -687,10 +750,10 @@ nodeInfo g w = [NodeInfo (Text.pack $ label x) (fromMaybe w (join w')) p | (x, (
          (nodePos g)
          (nodeWidth g)
 
-data EdgeInfo = EdgeInfo { ewidth :: Double, curve :: [PathData Double] } deriving (Eq, Show, Generic)
+data EdgeInfo = EdgeInfo { elabel :: (ID,ID), ewidth :: Double, curve :: [PathData Double] } deriving (Eq, Show, Generic)
 
 edgeInfo :: Graph -> Double -> [EdgeInfo]
-edgeInfo g w = [EdgeInfo (fromMaybe w (join w')) (splinePath p) | ((_, _), (Just p, w')) <- xs]
+edgeInfo g w = [EdgeInfo (x,y) (fromMaybe w (join w')) (splinePath p) | ((x, y), (Just p, w')) <- xs]
   where
     xs = Map.toList $
          merge
@@ -713,38 +776,7 @@ splinePath sp = s' <> p1' <> cs <> e'
     p1' = [StartP (view #splineP1 sp)]
     cs = (\(x,y,z) -> CubicP x y z) <$> view #splineTriples sp
 
--- | convert a (processed) 'Graph' to a 'ChartSvg'
---
--- >>> import Chart
--- >>> import DotParse.Examples (exInt)
--- >>> writeChartSvg "exg1.svg" (graphToChart exInt)
---
-graphToChart :: Graph -> ChartSvg
-graphToChart g =
-  mempty
-    & #charts .~ named "edges" ps <> named "shapes" c0 <> named "labels" [ts]
-    & #svgOptions % #svgHeight .~ 500
-    & #hudOptions .~ (mempty & #chartAspect .~ ChartAspect)
-  where
-    glyphs w = case view (attL NodeType (ID "shape")) g of
-      Just (ID "circle") -> defaultGlyphStyle & #shape .~ CircleGlyph & #size .~ 72 * w & #borderSize .~ 0.5 & #borderColor .~ black & #color .~ transparent
-      Just (ID "box") -> defaultGlyphStyle & #shape .~ RectSharpGlyph (h/w) & #size .~ 72 * w & #borderSize .~ 0.5 & #borderColor .~ black & #color .~ transparent
-      -- defaults to circle
-      _ -> defaultGlyphStyle & #shape .~ CircleGlyph & #size .~ 72 * w & #borderSize .~ 0.5 & #borderColor .~ black & #color .~ transparent
-    h = maybe 0.5 (runParser_ double . packUTF8 . label) (view (attL NodeType (ID "height")) g)
-    vshift' = -3.7
-    -- node information
-    ns = nodeInfo g 0.5
-    -- edge information
-    es = edgeInfo g 0.5
-    -- paths
-    ps = fmap (\(EdgeInfo w p) -> PathChart (defaultPathStyle & #borderSize .~ w & #borderColor .~ black & #color .~ transparent) p) es
-    -- circles
-    c0 = fmap (\(NodeInfo _ w p) -> GlyphChart (glyphs w) [p]) ns
-    -- labels
-    ts =
-      TextChart (defaultTextStyle & #size .~ 14) ((\(NodeInfo l _ (Point x y)) -> (l,Point x (vshift' + y))) <$> ns)
-
+-- | create Statements from a (no edge label) algebraic graph
 toStatements :: Directed -> G.Graph ByteString -> [Statement]
 toStatements d g =
   ((\x -> StatementNode $ NodeStatement (IDQuoted x) Nothing Map.empty) <$> G.vertexList g) <>
@@ -755,3 +787,36 @@ toStatements d g =
       (EdgeID (IDQuoted x) Nothing)
       (fromList [EdgeID (IDQuoted y) Nothing])
       Map.empty) <$> G.edgeList g)
+
+
+-- | convert a 'Graph' processed via the graphviz commands to a 'ChartSvg'
+--
+-- >>> import Chart
+-- >>> import DotParse.Examples (exInt)
+-- >>> writeChartSvg "exg1.svg" (graphToChart exInt)
+--
+graphToChart :: (ID -> Text) -> Graph -> ChartSvg
+graphToChart labelf g =
+  mempty
+    & #charts .~ named "edges" ps <> named "shapes" c0 <> named "labels" [ts]
+    & #svgOptions % #svgHeight .~ 500
+    & #hudOptions .~ (mempty & #chartAspect .~ ChartAspect)
+  where
+    glyphs w = case view (attL NodeType (ID "shape")) g of
+      Just (ID "circle") -> defaultGlyphStyle & #shape .~ CircleGlyph & #size .~ 72 * w & #borderSize .~ 0.5 & #borderColor .~ black & #color .~ transparent
+      Just (ID "box") -> defaultGlyphStyle & #shape .~ RectSharpGlyph (h/w) & #size .~ 72 * w & #borderSize .~ 1 & #borderColor .~ over lightness' (*0.5) (palette1 0) & #color .~ set opac' 0.2 (palette1 0)
+      -- defaults to circle
+      _ -> defaultGlyphStyle & #shape .~ CircleGlyph & #size .~ 72 * w & #borderSize .~ 1 & #borderColor .~ palette1 0 & #color .~ transparent
+    h = maybe 0.5 (runParser_ double . packUTF8 . label) (view (attL NodeType (ID "height")) g)
+    vshift' = -3.7
+    -- node information
+    ns = nodeInfo g 0.5
+    -- edge information
+    es = edgeInfo g 0.5
+    -- paths
+    ps = fmap (\(EdgeInfo _ w p) -> PathChart (defaultPathStyle & #borderSize .~ (2 * w) & #borderColor .~ over lightness' (*0.5) (palette1 0) & #color .~ transparent) p) es
+    -- circles
+    c0 = fmap (\(NodeInfo _ w p) -> GlyphChart (glyphs w) [p]) ns
+    -- labels
+    ts =
+      TextChart (defaultTextStyle & #size .~ 14 & #color .~ over lightness' (*0.5) (palette1 0)) ((\(NodeInfo l _ (Point x y)) -> (labelf l, Point x (vshift' + y))) <$> ns)

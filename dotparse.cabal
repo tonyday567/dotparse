@@ -25,21 +25,20 @@ library
     -hiedir=.hie
 
   build-depends:
+    , algebraic-graphs ^>=0.6
     , base           >=4.7         && <5
+    , bytestring     ^>=0.11.3
     , chart-svg      ^>=0.3
     , containers     ^>=0.6
+    , flatparse      ^>=0.3.2
+    , neat-interpolation ^>=0.5.1
     , numhask        ^>=0.10
     , numhask-space  ^>=0.10
-    , optics-core
+    , optics-core    ^>=0.4
+    , process-extras ^>=0.7.4
+    , template-haskell ^>=2.16
     , text           ^>=1.2
-    , flatparse
-    , bytestring
-    , template-haskell
-    , neat-interpolation
-    , these
-    , algebraic-graphs
-    , process-extras
-    , xeno
+    , these ^>=1.1.1
 
   exposed-modules:
     DotParse

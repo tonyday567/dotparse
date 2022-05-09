@@ -22,4 +22,4 @@
   .legendBorder g {
     fill: #0d0d0d;
   }
-}</style><g class="chart"></g><g class="hud"></g></svg>
+}</style><g class="chart"><g class="edges"></g><g class="shapes"></g><g class="labels"></g></g><g class="hud"></g></svg>

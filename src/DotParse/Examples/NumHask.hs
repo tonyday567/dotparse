@@ -16,11 +16,9 @@ import qualified Data.Map.Strict as Map
 import Optics.Core
 import GHC.IO.Unsafe
 import Chart
-import qualified Algebra.Graph.Labelled as L
 import Data.Monoid
 import DotParse
 import qualified Algebra.Graph as G
--- import qualified Xeno.DOM as X
 import NeatInterpolation
 import Data.Text (Text, pack)
 import Data.Bifunctor
@@ -280,31 +278,17 @@ classesModule =
     (Ratio, "NumHask-Data-Rational")
   ]
 
-toLink :: Text -> Text
-toLink c = [trimming|<a href="https://hackage.haskell.org/package/numhask/docs/$m.html#t:$c">$c</a>|]
-  where
-    m = Map.fromList (first (pack . show) <$> classesModule) Map.! c
-
 dependenciesNH :: [Dependency] -> [Dependency]
 dependenciesNH = filter (\(Dependency x0 x1 _) -> x0 `elem` classesNH && x1 `elem` classesNH)
 
-graphNH :: L.Graph (First Family) Class
-graphNH =
-  L.edges ((\(Dependency x y l) -> (First l,x,y)) <$> dependenciesNH dependencies) <>
-  L.vertices classesNH
-
+-- | NumHask Classes as an algebraic graph
 graphNHG :: G.Graph Class
 graphNHG =
   G.edges ((\(Dependency x y _) -> (x,y)) <$> dependenciesNH dependencies) <>
   G.vertices classesNH
 
-fromFamily :: First Family -> Colour
-fromFamily (First f) = case f of
-  Nothing -> palette1 0
-  Just Addition -> palette1 1
-  Just Multiplication -> palette1 2
-  Just Actor -> palette1 3
-
+-- | NumHask statements in a dot Graph with box shapes for the nodes.
+--
 dotGraphNH :: Directed -> Graph
 dotGraphNH d =
   defaultGraph &
@@ -317,49 +301,19 @@ dotGraphNH' :: Directed -> Graph
 dotGraphNH' d = unsafePerformIO $ processGraph (dotGraphNH d)
 {-# NOINLINE dotGraphNH' #-}
 
--- |
+-- | Convert a node ID to a label for chart-svg charts
 --
--- > import Chart
--- > t1 = encodeUtf8 $ chartSvg (graphToChart (dotGraphNH' Directed))
--- > writeChartSvg "other/t1.svg" (graphToChart (dotGraphNH' UnDirected))
-nhExample :: Directed -> ChartSvg
-nhExample d = graphToChart (dotGraphNH' d)
-
--- | convert a (processed) 'Graph' to a 'ChartSvg'
---
--- >>> import Chart
--- >>> import DotParse.Examples (exInt)
--- >>> writeChartSvg "exg1.svg" (graphToChart exInt)
---
-graphToChart' :: Graph -> ChartSvg
-graphToChart' g =
-  mempty
-    & #charts .~ named "edges" ps <> named "shapes" c0 <> named "labels" [ts]
-    & #svgOptions % #svgHeight .~ 500
-    & #hudOptions .~ (mempty & #chartAspect .~ ChartAspect)
+-- Doing this directly in dot doesn't quite work because the engines get the width of the link wrong.
+toLink :: ID -> Text
+toLink i = [trimming|<a href="https://hackage.haskell.org/package/numhask/docs/$m.html#t:$t">$t</a>|]
   where
-    glyphs w = case view (attL NodeType (ID "shape")) g of
-      Just (ID "circle") -> defaultGlyphStyle & #shape .~ CircleGlyph & #size .~ 72 * w & #borderSize .~ 0.5 & #borderColor .~ black & #color .~ transparent
-      Just (ID "box") -> defaultGlyphStyle & #shape .~ RectSharpGlyph (h/w) & #size .~ 72 * w & #borderSize .~ 1 & #borderColor .~ over lightness' (*0.5) (palette1 0) & #color .~ set opac' 0.2 (palette1 0)
-      -- defaults to circle
-      _ -> defaultGlyphStyle & #shape .~ CircleGlyph & #size .~ 72 * w & #borderSize .~ 1 & #borderColor .~ palette1 0 & #color .~ transparent
-    h = maybe 0.5 (runParser_ double . packUTF8 . label) (view (attL NodeType (ID "height")) g)
-    vshift' = -3.7
-    -- node information
-    ns = nodeInfo g 0.5
-    -- edge information
-    es = edgeInfo g 0.5
-    -- paths
-    ps = fmap (\(EdgeInfo w p) -> PathChart (defaultPathStyle & #borderSize .~ (2 * w) & #borderColor .~ over lightness' (*0.5) (palette1 0) & #color .~ transparent) p) es
-    -- circles
-    c0 = fmap (\(NodeInfo _ w p) -> GlyphChart (glyphs w) [p]) ns
-    -- labels
-    ts =
-      TextChart (defaultTextStyle & #size .~ 14 & #color .~ over lightness' (*0.5) (palette1 0)) ((\(NodeInfo l _ (Point x y)) -> (toLink l, Point x (vshift' + y))) <$> ns)
+    t = pack (label i)
+    m = Map.fromList (first (pack . show) <$> classesModule) Map.! t
 
-
--- |
+-- | A chart-svg chart with label links
+--
+-- > writeChartSvg "other/nh.svg" (graphToChart toLink (dotGraphNH' Directed))
 --
 -- ![NumHask Example](other/nh.svg)
 writeNHChart :: IO ()
-writeNHChart = writeChartSvg "other/nh.svg" (graphToChart' (dotGraphNH' Directed))
+writeNHChart = writeChartSvg "other/nh.svg" (graphToChart toLink (dotGraphNH' Directed))

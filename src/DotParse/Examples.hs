@@ -14,14 +14,12 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TupleSections #-}
 
--- | Abstract Grammar from:
--- http://www.graphviz.org/doc/info/lang.html
-
+-- | Examples of conversion from dot ByteStrings
 module DotParse.Examples where
 
 import NeatInterpolation
 import Data.Text.Encoding (encodeUtf8)
-import Data.ByteString hiding (zip, zipWith, putStrLn, map, length, head, empty)
+import Data.ByteString hiding (zip, zipWith, map, length, head, empty)
 import Data.Proxy
 import Prelude hiding (replicate)
 import Control.Monad
@@ -42,7 +40,7 @@ import Optics.Core
 -- >>> runDotParser ex0 :: Graph
 -- Graph {strict = Last {getLast = Just NoMergeEdges}, directed = Last {getLast = Just UnDirected}, graphid = Last {getLast = Nothing}, nodeAttributes = fromList [], graphAttributes = fromList [], edgeAttributes = fromList [], globalAttributes = fromList [], nodes = [], edges = [], subgraphs = []}
 --
--- >>> testDotParser (Proxy :: Proxy Graph) ex0
+-- >>> testDotParser (Proxy :: Proxy Graph) defaultDotConfig ex0
 --
 ex0 :: ByteString
 ex0 = encodeUtf8 [trimming|
@@ -51,7 +49,7 @@ graph {}
 
 -- | Examples from https://renenyffenegger.ch/notes/tools/Graphviz/examples/index
 --
--- >>> testDotParser (Proxy :: Proxy Graph) ex1
+-- >>> testDotParser (Proxy :: Proxy Graph) defaultDotConfig ex1
 --
 ex1 :: ByteString
 ex1 = encodeUtf8 [trimming|
@@ -66,7 +64,7 @@ digraph D {
 |]
 
 -- |
--- >>> testDotParser (Proxy :: Proxy Graph) ex2
+-- >>> testDotParser (Proxy :: Proxy Graph) defaultDotConfig ex2
 ex2 :: ByteString
 ex2 = encodeUtf8 [trimming|
 digraph D {
@@ -80,7 +78,7 @@ digraph D {
 |]
 
 -- |
--- >>> testDotParser (Proxy :: Proxy Graph) ex3
+-- >>> testDotParser (Proxy :: Proxy Graph) defaultDotConfig ex3
 ex3 :: ByteString
 ex3 = encodeUtf8 [trimming|
 digraph D {
@@ -408,7 +406,7 @@ testAll :: IO ()
 testAll = zipWithM_ (>>)
   (putStrLn <$> ["ex0","ex1","ex2","ex3","ex4","ex5","ex6","ex7"
                 ,"ex8","ex9","ex10","ex11","ex12","ex13","ex14","ex15"])
-  (testDotParser (Proxy :: Proxy Graph) <$>
+  (testDotParser (Proxy :: Proxy Graph) defaultDotConfig <$>
   [ex0,ex1,ex2,ex3,ex4,ex5,ex6,ex7,ex8,ex9,ex10,ex11,ex12,ex13,ex14,ex15])
 
 gInt1 :: G.Graph Int
