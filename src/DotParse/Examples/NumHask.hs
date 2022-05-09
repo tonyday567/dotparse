@@ -1,26 +1,27 @@
-{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
 {-# HLINT ignore "Use ?~" #-}
 
 -- | Example of Dot graph construction for the NumHask class heirarchy.
 module DotParse.Examples.NumHask where
 
-import Prelude hiding (replicate)
-import qualified Data.Map.Strict as Map
-import Optics.Core
-import GHC.IO.Unsafe
-import Chart
-import Data.Monoid
-import DotParse
 import qualified Algebra.Graph as G
-import Data.Text (Text, pack)
+import Chart
 import Data.Bifunctor
+import qualified Data.Map.Strict as Map
+import Data.Monoid
+import Data.Text (Text, pack)
+import DotParse
+import GHC.IO.Unsafe
+import Optics.Core
+import Prelude hiding (replicate)
 
 -- $setup
 -- >>> import DotParse
@@ -210,18 +211,17 @@ dependenciesNH = filter (\(Dependency x0 x1 _) -> x0 `elem` classesNH && x1 `ele
 -- | NumHask Classes as an algebraic graph
 graphNHG :: G.Graph Class
 graphNHG =
-  G.edges ((\(Dependency x y _) -> (x,y)) <$> dependenciesNH dependencies) <>
-  G.vertices classesNH
+  G.edges ((\(Dependency x y _) -> (x, y)) <$> dependenciesNH dependencies)
+    <> G.vertices classesNH
 
 -- | NumHask statements in a dot Graph with box shapes for the nodes.
---
 dotGraphNH :: Directed -> Graph
 dotGraphNH d =
-  defaultGraph &
-  #directed .~ Last (Just d) &
-  addStatements (toStatements d (packUTF8 . show <$> graphNHG)) &
-  attL NodeType (ID "shape") .~ Just (ID "box") &
-  gattL (ID "rankdir") .~ Just (IDQuoted "BT")
+  defaultGraph
+    & #directed .~ Last (Just d)
+    & addStatements (toStatements d (packUTF8 . show <$> graphNHG))
+    & attL NodeType (ID "shape") .~ Just (ID "box")
+    & gattL (ID "rankdir") .~ Just (IDQuoted "BT")
 
 dotGraphNH' :: Directed -> Graph
 dotGraphNH' d = unsafePerformIO $ processGraph (dotGraphNH d)
