@@ -1,3 +1,4 @@
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BlockArguments #-}
@@ -19,6 +20,10 @@ import qualified Algebra.Graph.Labelled as L
 import Data.Monoid
 import DotParse
 import qualified Algebra.Graph as G
+-- import qualified Xeno.DOM as X
+import NeatInterpolation
+import Data.Text (Text, pack)
+import Data.Bifunctor
 
 -- $setup
 -- >>> import DotParse
@@ -243,7 +248,6 @@ classesNH =
     TrigField,
     Signed,
     Norm,
-    Basis,
     Direction,
     MultiplicativeAction,
     Module,
@@ -252,6 +256,34 @@ classesNH =
     Integral,
     Ratio
   ]
+
+classesModule :: [(Class, Text)]
+classesModule =
+  [ (Additive, "NumHask-Algebra-Additive"),
+    (Subtractive, "NumHask-Algebra-Additive"),
+    (Multiplicative, "NumHask-Algebra-Multiplicative"),
+    (Divisive, "NumHask-Algebra-Multiplicative"),
+    (Distributive, "NumHask-Algebra-Distributive"),
+    (Ring, "NumHask-Algebra-Ring"),
+    (Field, "NumHask-Algebra-Field"),
+    (ExpField, "NumHask-Algebra-Field"),
+    (QuotientField, "NumHask-Algebra-Field"),
+    (TrigField, "NumHask-Algebra-Field"),
+    (Signed, "NumHask-Algebra-Metric"),
+    (Norm, "NumHask-Algebra-Metric"),
+    (Direction, "NumHask-Algebra-Metric"),
+    (MultiplicativeAction, "NumHask-Algebra-Module"),
+    (Module, "NumHask-Algebra-Module"),
+    (UpperBoundedField, "NumHask-Algebra-Field"),
+    (LowerBoundedField, "NumHask-Algebra-Field"),
+    (Integral, "NumHask-Data-Integral"),
+    (Ratio, "NumHask-Data-Rational")
+  ]
+
+toLink :: Text -> Text
+toLink c = [trimming|<a href="https://hackage.haskell.org/package/numhask/docs/$m.html#t:$c">$c</a>|]
+  where
+    m = Map.fromList (first (pack . show) <$> classesModule) Map.! c
 
 dependenciesNH :: [Dependency] -> [Dependency]
 dependenciesNH = filter (\(Dependency x0 x1 _) -> x0 `elem` classesNH && x1 `elem` classesNH)
@@ -288,6 +320,46 @@ dotGraphNH' d = unsafePerformIO $ processGraph (dotGraphNH d)
 -- |
 --
 -- > import Chart
+-- > t1 = encodeUtf8 $ chartSvg (graphToChart (dotGraphNH' Directed))
 -- > writeChartSvg "other/t1.svg" (graphToChart (dotGraphNH' UnDirected))
 nhExample :: Directed -> ChartSvg
 nhExample d = graphToChart (dotGraphNH' d)
+
+-- | convert a (processed) 'Graph' to a 'ChartSvg'
+--
+-- >>> import Chart
+-- >>> import DotParse.Examples (exInt)
+-- >>> writeChartSvg "exg1.svg" (graphToChart exInt)
+--
+graphToChart' :: Graph -> ChartSvg
+graphToChart' g =
+  mempty
+    & #charts .~ named "edges" ps <> named "shapes" c0 <> named "labels" [ts]
+    & #svgOptions % #svgHeight .~ 500
+    & #hudOptions .~ (mempty & #chartAspect .~ ChartAspect)
+  where
+    glyphs w = case view (attL NodeType (ID "shape")) g of
+      Just (ID "circle") -> defaultGlyphStyle & #shape .~ CircleGlyph & #size .~ 72 * w & #borderSize .~ 0.5 & #borderColor .~ black & #color .~ transparent
+      Just (ID "box") -> defaultGlyphStyle & #shape .~ RectSharpGlyph (h/w) & #size .~ 72 * w & #borderSize .~ 1 & #borderColor .~ over lightness' (*0.5) (palette1 0) & #color .~ set opac' 0.2 (palette1 0)
+      -- defaults to circle
+      _ -> defaultGlyphStyle & #shape .~ CircleGlyph & #size .~ 72 * w & #borderSize .~ 1 & #borderColor .~ palette1 0 & #color .~ transparent
+    h = maybe 0.5 (runParser_ double . packUTF8 . label) (view (attL NodeType (ID "height")) g)
+    vshift' = -3.7
+    -- node information
+    ns = nodeInfo g 0.5
+    -- edge information
+    es = edgeInfo g 0.5
+    -- paths
+    ps = fmap (\(EdgeInfo w p) -> PathChart (defaultPathStyle & #borderSize .~ (2 * w) & #borderColor .~ over lightness' (*0.5) (palette1 0) & #color .~ transparent) p) es
+    -- circles
+    c0 = fmap (\(NodeInfo _ w p) -> GlyphChart (glyphs w) [p]) ns
+    -- labels
+    ts =
+      TextChart (defaultTextStyle & #size .~ 14 & #color .~ over lightness' (*0.5) (palette1 0)) ((\(NodeInfo l _ (Point x y)) -> (toLink l, Point x (vshift' + y))) <$> ns)
+
+
+-- |
+--
+-- ![NumHask Example](other/nh.svg)
+writeNHChart :: IO ()
+writeNHChart = writeChartSvg "other/nh.svg" (graphToChart' (dotGraphNH' Directed))

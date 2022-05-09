@@ -39,6 +39,7 @@ library
     , these
     , algebraic-graphs
     , process-extras
+    , xeno
 
   exposed-modules:
     DotParse

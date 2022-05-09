@@ -71,7 +71,9 @@ module DotParse.Types
    nodeWidth,
    edgeSpline,
    edgeWidth,
+   NodeInfo (..),
    nodeInfo,
+   EdgeInfo (..),
    edgeInfo,
    splinePath,
 
@@ -720,7 +722,7 @@ splinePath sp = s' <> p1' <> cs <> e'
 graphToChart :: Graph -> ChartSvg
 graphToChart g =
   mempty
-    & #charts .~ unnamed (ps <> c0 <> [ts])
+    & #charts .~ named "edges" ps <> named "shapes" c0 <> named "labels" [ts]
     & #svgOptions % #svgHeight .~ 500
     & #hudOptions .~ (mempty & #chartAspect .~ ChartAspect)
   where
