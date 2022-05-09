@@ -1,5 +1,7 @@
 #+TITLE: dotparse
 
+[[https://hackage.haskell.org/package/chart-svg][file:https://img.shields.io/hackage/v/dotparse.svg]] [[https://github.com/tonyday567/chart-svg/actions?query=workflow%3Ahaskell-ci][file:https://github.com/tonyday567/dotparse/workflows/haskell-ci/badge.svg]]
+
 Parsing and printing for the dot language of graphviz.
 
 - A close rendition of the [[http://www.graphviz.org/doc/info/lang.html][dot language specification]]
