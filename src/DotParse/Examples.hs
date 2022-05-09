@@ -30,8 +30,6 @@ import Optics.Core
 -- $setup
 -- >>> import DotParse
 -- >>> import Data.Proxy
--- >>> import DotParse.FlatParse
--- >>> import FlatParse.Basic
 -- >>> :set -XOverloadedStrings
 
 -- * examples
@@ -51,6 +49,7 @@ graph {}
 --
 -- >>> testDotParser (Proxy :: Proxy Graph) defaultDotConfig ex1
 --
+-- ![Example](other/ex1.svg)
 ex1 :: ByteString
 ex1 = encodeUtf8 [trimming|
 digraph D {
@@ -65,6 +64,8 @@ digraph D {
 
 -- |
 -- >>> testDotParser (Proxy :: Proxy Graph) defaultDotConfig ex2
+--
+-- ![Example](other/ex2.svg)
 ex2 :: ByteString
 ex2 = encodeUtf8 [trimming|
 digraph D {
@@ -79,6 +80,8 @@ digraph D {
 
 -- |
 -- >>> testDotParser (Proxy :: Proxy Graph) defaultDotConfig ex3
+--
+-- ![Example](other/ex3.svg)
 ex3 :: ByteString
 ex3 = encodeUtf8 [trimming|
 digraph D {
@@ -86,6 +89,9 @@ digraph D {
 }
 |]
 
+-- |
+--
+-- ![Example](other/ex4.svg)
 ex4 :: ByteString
 ex4 = encodeUtf8 [trimming|
 digraph L {
@@ -101,6 +107,9 @@ digraph L {
 }
 |]
 
+-- |
+--
+-- ![Example](other/ex5.svg)
 ex5 :: ByteString
 ex5 = encodeUtf8 [trimming|
 digraph D {
@@ -116,6 +125,9 @@ digraph D {
 }
 |]
 
+-- |
+--
+-- ![Example](other/ex6.svg)
 ex6 :: ByteString
 ex6 = encodeUtf8 [trimming|
 digraph D {
@@ -130,12 +142,12 @@ digraph D {
 }
 |]
 
-
+-- |
+--
+-- ![Example](other/ex7.svg)
 ex7 :: ByteString
 ex7 = encodeUtf8 [trimming|
 digraph R {
-
-  node [shape=record];
 
   { rank=same rA sA tA }
   { rank=same uB vB wB }
@@ -151,12 +163,12 @@ digraph R {
 }
 |]
 
+-- |
+--
+-- ![Example](other/ex8.svg)
 ex8 :: ByteString
 ex8 = encodeUtf8 [trimming|
 digraph Q {
-
-  node [shape=record];
-
 
   nd_1   [label = "Node 1"];
   nd_2   [label = "Node 2"];
@@ -181,6 +193,9 @@ digraph Q {
 }
 |]
 
+-- |
+--
+-- ![Example](other/ex9.svg)
 ex9 :: ByteString
 ex9 = encodeUtf8 [trimming|
 digraph D {
@@ -212,6 +227,9 @@ digraph D {
 }
 |]
 
+-- |
+--
+-- ![Example](other/ex10.svg)
 ex10 :: ByteString
 ex10 = encodeUtf8 [trimming|
 digraph H {
@@ -230,6 +248,9 @@ digraph H {
 
 }|]
 
+-- |
+--
+-- ![Example](other/ex11.svg)
 ex11 :: ByteString
 ex11 = encodeUtf8 [trimming|
 digraph {
@@ -265,6 +286,9 @@ digraph {
 }
 |]
 
+-- |
+--
+-- ![Example](other/ex12.svg)
 ex12 :: ByteString
 ex12 = encodeUtf8 [trimming|
 digraph D {
@@ -282,6 +306,9 @@ digraph D {
 }
 |]
 
+-- |
+--
+-- ![Example](other/ex13.svg)
 ex13 :: ByteString
 ex13 = encodeUtf8 [trimming|
 digraph H {
@@ -300,6 +327,9 @@ digraph H {
 }
 |]
 
+-- |
+--
+-- ![Example](other/ex14.svg)
 ex14 :: ByteString
 ex14 = encodeUtf8 [trimming|
 digraph H {
@@ -344,6 +374,9 @@ digraph H {
 }
 |]
 
+-- |
+--
+-- ![Example](other/ex15.svg)
 ex15 :: ByteString
 ex15 = encodeUtf8 [trimming|
 digraph D {
@@ -409,15 +442,27 @@ testAll = zipWithM_ (>>)
   (testDotParser (Proxy :: Proxy Graph) defaultDotConfig <$>
   [ex0,ex1,ex2,ex3,ex4,ex5,ex6,ex7,ex8,ex9,ex10,ex11,ex12,ex13,ex14,ex15])
 
-gInt1 :: G.Graph Int
-gInt1 = G.edges $
+
+-- processDotWith :: Directed -> [String] -> ByteString
+svgAll :: IO ()
+svgAll = zipWithM_ (>>)
+  (putStrLn <$> ["ex0","ex1","ex2","ex3","ex4","ex5","ex6","ex7"
+                ,"ex8","ex9","ex10","ex11","ex12","ex13","ex14","ex15"])
+  (zipWith (\b f -> processDotWith Directed ["-Tsvg", "-oother/"<>f<>".svg"] b)
+  [ex0,ex1,ex2,ex3,ex4,ex5,ex6,ex7,ex8,ex9,ex10,ex11,ex12,ex13,ex14,ex15]
+  ["ex0","ex1","ex2","ex3","ex4","ex5","ex6","ex7"
+                ,"ex8","ex9","ex10","ex11","ex12","ex13","ex14","ex15"])
+
+-- | algebraic graph example
+exGInt :: G.Graph Int
+exGInt = G.edges $
     [(v, (v + 1) `mod` 6) | v <- [0 .. 5]]
         ++ [(v, v + k) | v <- [0 .. 5], k <- [6, 12]]
         ++ [(2, 18), (2, 19), (15, 18), (15, 19), (18, 3), (19, 3)]
 
-
 {- |
 
+> exInt = defaultGraph & addStatements (toStatements Directed (packUTF8 . show <$> exGInt))
 > import qualified Data.ByteString.Char8 as B
 > g <- processGraph exInt
 > B.putStrLn $ dotPrint g
@@ -477,4 +522,4 @@ digraph {
 
 -}
 exInt :: Graph
-exInt = defaultGraph & addStatements (toStatements Directed (packUTF8 . show <$> gInt1))
+exInt = defaultGraph & addStatements (toStatements Directed (packUTF8 . show <$> exGInt))

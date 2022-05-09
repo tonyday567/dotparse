@@ -63,6 +63,7 @@ htmlLike = ws *> $(char '<') *> go (1 :: Int) "<" where
     ($(char '<') *> go (n + 1) ('<':acc)) <|>
     (anyChar >>= (\c -> go n (c:acc)))
 
+-- | First character of a dot identifier.
 isValidStartChar :: Char -> Bool
 isValidStartChar c =
   ('A' <= c && c <= 'Z') ||
@@ -70,6 +71,7 @@ isValidStartChar c =
   ('\200' <= c && c <= '\377') ||
   (c == '_')
 
+-- | character of a dot identifier.
 isValidChar :: Char -> Bool
 isValidChar c = isValidStartChar c || isDigit c
 
@@ -113,6 +115,7 @@ data Error
                              --   but parse something else.
   deriving (Eq, Show)
 
+-- | position of error
 errorPos :: Error -> Pos
 errorPos (Precise p _)   = p
 errorPos (Imprecise p _) = p

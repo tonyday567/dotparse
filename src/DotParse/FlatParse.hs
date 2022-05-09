@@ -51,7 +51,7 @@ module DotParse.FlatParse
 import FlatParse.Basic hiding (cut, lines)
 import DotParse.FlatParse.TH hiding (merge)
 import Data.Char hiding (isDigit)
-import Data.ByteString hiding (zip, zipWith, putStrLn, map, length, head, empty)
+import Data.ByteString hiding (zip, zipWith, map, length, head, empty)
 import Data.Bool
 import Prelude hiding (replicate)
 import qualified Data.ByteString.Char8 as B
@@ -83,6 +83,7 @@ runParser_ p b = case runParser p b of
 digit :: Parser Error Int
 digit = (\c -> ord c - ord '0') <$> satisfyASCII isDigit
 
+-- | (unsigned) Int parser
 int :: Parser Error Int
 int = token do
   (place, n) <- chainr (\n (!place, !acc) -> (place*10,acc+place*n)) digit (pure (1, 0))
@@ -177,6 +178,7 @@ wrapCurlyPrint b = "{" <> b <> "}"
 pointP :: Parser Error (Point Double)
 pointP = token $ Point <$> double <*> ($(symbol ",") *> double)
 
+-- | dot specification of a cubic spline (and an arrow head which is ignored here)
 data Spline = Spline { splineEnd :: Maybe (Point Double), splineStart :: Maybe (Point Double), splineP1 :: Point Double, splineTriples :: [(Point Double, Point Double, Point Double)] } deriving (Eq, Show, Generic)
 
 -- |

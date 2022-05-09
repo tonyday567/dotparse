@@ -19,7 +19,6 @@ import Chart
 import Data.Monoid
 import DotParse
 import qualified Algebra.Graph as G
-import NeatInterpolation
 import Data.Text (Text, pack)
 import Data.Bifunctor
 
@@ -74,62 +73,6 @@ data Class
   | Direction
   | Epsilon
   deriving (Show, Eq, Ord)
-
-data Cluster
-  = GroupCluster
-  | LatticeCluster
-  | RingCluster
-  | FieldCluster
-  | HigherKindedCluster
-  | MeasureCluster
-  | NumHaskCluster
-  deriving (Show, Eq, Ord)
-
-clusters :: Map.Map Class Cluster
-clusters =
-  Map.fromList
-    [ (Magma, GroupCluster),
-      (Unital, GroupCluster),
-      (Associative, GroupCluster),
-      (Commutative, GroupCluster),
-      (Invertible, GroupCluster),
-      (Idempotent, GroupCluster),
-      (Absorbing, GroupCluster),
-      (Group, GroupCluster),
-      (AbelianGroup, GroupCluster),
-      (Additive, NumHaskCluster),
-      (Subtractive, NumHaskCluster),
-      (Multiplicative, NumHaskCluster),
-      (Divisive, NumHaskCluster),
-      (Distributive, NumHaskCluster),
-      (Semiring, NumHaskCluster),
-      (Ring, NumHaskCluster),
-      (IntegralDomain, NumHaskCluster),
-      (Field, NumHaskCluster),
-      (ExpField, FieldCluster),
-      (QuotientField, FieldCluster),
-      (UpperBoundedField, FieldCluster),
-      (LowerBoundedField, FieldCluster),
-      (TrigField, FieldCluster),
-      (AdditiveAction, HigherKindedCluster),
-      (SubtractiveAction, HigherKindedCluster),
-      (MultiplicativeAction, NumHaskCluster),
-      (DivisiveAction, HigherKindedCluster),
-      (Module, NumHaskCluster),
-      (JoinSemiLattice, LatticeCluster),
-      (MeetSemiLattice, LatticeCluster),
-      (Lattice, LatticeCluster),
-      (BoundedJoinSemiLattice, LatticeCluster),
-      (BoundedMeetSemiLattice, LatticeCluster),
-      (BoundedLattice, LatticeCluster),
-      (Norm, RingCluster),
-      (Basis, RingCluster),
-      (Direction, RingCluster),
-      (Signed, RingCluster),
-      (Epsilon, MeasureCluster),
-      (Integral, RingCluster),
-      (Ratio, FieldCluster)
-    ]
 
 data Family
   = Addition
@@ -213,23 +156,6 @@ dependencies =
     Dependency Epsilon MeetSemiLattice Nothing,
     Dependency Integral Ring Nothing,
     Dependency Ratio Field Nothing
-  ]
-
-magmaClasses :: [Class]
-magmaClasses =
-  [ Magma,
-    Unital,
-    Associative,
-    Commutative,
-    Invertible,
-    Absorbing,
-    Additive,
-    Subtractive,
-    Multiplicative,
-    Divisive,
-    Distributive,
-    Ring,
-    Field
   ]
 
 classesNH :: [Class]
@@ -316,4 +242,4 @@ toLink i = [trimming|<a href="https://hackage.haskell.org/package/numhask/docs/$
 --
 -- ![NumHask Example](other/nh.svg)
 writeNHChart :: IO ()
-writeNHChart = writeChartSvg "other/nh.svg" (graphToChart toLink (dotGraphNH' Directed))
+writeNHChart = writeChartSvg "other/nh.svg" (graphToChartWith (defaultChartConfig & #labelf .~ toLink) (dotGraphNH' Directed))

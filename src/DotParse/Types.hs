@@ -1,3 +1,4 @@
+{-# OPTIONS_HADDOCK not-home #-}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
@@ -82,8 +83,12 @@ module DotParse.Types
    splinePath,
 
    -- * Conversion
+   graphToChartWith,
    graphToChart,
+   ChartConfig (..),
+   defaultChartConfig,
    toStatements,
+
 
  ) where
 
@@ -111,17 +116,14 @@ import Chart
 import Data.Maybe
 import Data.Map.Merge.Strict
 import Data.Monoid
+import qualified Data.Text as Text
 
 -- $setup
 -- >>> import DotParse
--- >>> import DotParse.FlatParse
--- >>> import FlatParse.Basic
--- >>> import Data.Proxy
--- >>> import NeatInterpolation
--- >>> import Data.Text.Encoding (encodeUtf8)
 -- >>> import qualified Data.Map as Map
 -- >>> :set -XOverloadedStrings
 
+-- | printing options, for separators.
 data DotConfig = DotConfig
   {
     topLevelSep :: ByteString,
@@ -130,10 +132,11 @@ data DotConfig = DotConfig
     subGraphSep :: ByteString
   } deriving (Eq, Show, Generic)
 
+-- | default separators
 defaultDotConfig :: DotConfig
 defaultDotConfig = DotConfig " " "\n    " ";" ";"
 
--- * A parser & printer class for a graphviz graph and components of its dot language
+-- | A parser & printer class for a graphviz graph and components of its dot language
 class DotParse a where
   dotPrint :: DotConfig -> a -> ByteString
   dotParse :: Parser Error a
@@ -293,10 +296,10 @@ instance DotParse Statement
 -- OK (ID "apple_1") "'"
 --
 -- >>> :set -XQuasiQuotes
--- >>> runParser dotParse $ encodeUtf8 [trimming|"hello/""|] :: Result Error ID
--- OK (IDQuoted "hello\"") ""
+-- >>> runParser dotParse "\"hello\"" :: Result Error ID
+-- OK (IDQuoted "hello") ""
 --
--- >>> runDotParser (encodeUtf8 [trimming|<The <font color='red'><b>foo</b></font>,<br/> the <font point-size='20'>bar</font> and<br/> the <i>baz</i>>|]) :: ID
+-- >>> runDotParser "<The <font color='red'><b>foo</b></font>,<br/> the <font point-size='20'>bar</font> and<br/> the <i>baz</i>>" :: ID
 -- IDHtml "<The <font color='red'><b>foo</b></font>,<br/> the <font point-size='20'>bar</font> and<br/> the <i>baz</i>>"
 data ID = ID ByteString | IDInt Int | IDDouble Double | IDQuoted ByteString | IDHtml ByteString deriving (Eq, Show, Generic, Ord)
 
@@ -564,6 +567,7 @@ instance DotParse SubGraphStatement
       x <- optional ($(keyword "subgraph") *> dotParse)
       pure (SubGraphStatement x) <*> wrapCurlyP (many (optional sepP *> dotParse))
 
+-- | add a graphviz statement to a 'Graph'
 addStatement :: Statement -> Graph -> Graph
 addStatement (StatementNode n) g = g & #nodes %~ (<>[n])
 addStatement (StatementEdge e) g = g & #edges %~ (<>[e])
@@ -573,6 +577,7 @@ addStatement (StatementAttribute (AttributeStatement NodeType as)) g = g & #node
 addStatement (StatementAttribute (AttributeStatement EdgeType as)) g = g & #edgeAttributes %~ (<> as)
 addStatement (StatementGlobalAttribute (GlobalAttributeStatement s)) g = g & #globalAttributes %~ (<> Map.fromList [s])
 
+-- | add a list of graphviz statements to a 'Graph'
 addStatements :: [Statement] -> Graph -> Graph
 addStatements ss g = Prelude.foldr addStatement g ss
 
@@ -737,8 +742,10 @@ edgeSpline g =
            _ -> Nothing) $
   edgesA g (ID "pos")
 
+-- | typical node information after processing a dot bytestring.
 data NodeInfo = NodeInfo { nlabel :: ID, nwidth :: Double, pos :: Point Double } deriving (Eq, Show, Generic)
 
+-- | Create a list of NodeInfo from a graph.
 nodeInfo :: Graph -> Double -> [NodeInfo]
 nodeInfo g w = [NodeInfo x (fromMaybe w (join w')) p | (x, (Just p, w')) <- xs]
   where
@@ -750,8 +757,10 @@ nodeInfo g w = [NodeInfo x (fromMaybe w (join w')) p | (x, (Just p, w')) <- xs]
          (nodePos g)
          (nodeWidth g)
 
+-- | typical edge information after processing a dot bytestring.
 data EdgeInfo = EdgeInfo { elabel :: (ID,ID), ewidth :: Double, curve :: [PathData Double] } deriving (Eq, Show, Generic)
 
+-- | Create a list of EdgeInfo from a graph
 edgeInfo :: Graph -> Double -> [EdgeInfo]
 edgeInfo g w = [EdgeInfo (x,y) (fromMaybe w (join w')) (splinePath p) | ((x, y), (Just p, w')) <- xs]
   where
@@ -788,35 +797,60 @@ toStatements d g =
       (fromList [EdgeID (IDQuoted y) Nothing])
       Map.empty) <$> G.edgeList g)
 
+-- | Various configutaion parameters for the chart-svg Chart
+--
+data ChartConfig =
+  ChartConfig {
+    chartHeight :: Double,
+    chartScale :: Double,
+    edgeSize :: Double,
+    chartColor :: Colour,
+    chartBackgroundColor :: Colour,
+    nodeHeight :: Double,
+    nodeSize :: Double,
+    vshift :: Double,
+    textSize :: Double,
+    labelf :: ID -> Text
+       } deriving (Generic)
+
+-- | default parameters
+defaultChartConfig :: ChartConfig
+defaultChartConfig = ChartConfig 500 72 0.5 (over lightness' (*0.5) (palette1 0)) (set opac' 0.2 (palette1 0)) 0.5 0.5 (-3.7) 14 (Text.pack . label)
 
 -- | convert a 'Graph' processed via the graphviz commands to a 'ChartSvg'
 --
 -- >>> import Chart
 -- >>> import DotParse.Examples (exInt)
--- >>> writeChartSvg "exg1.svg" (graphToChart exInt)
+-- >>> ex <- processGraph exInt
+-- >>> writeChartSvg "other/ex.svg" (graphToChartWith defaultChartConfig ex)
 --
-graphToChart :: (ID -> Text) -> Graph -> ChartSvg
-graphToChart labelf g =
+-- ![Example](other/ex.svg)
+graphToChartWith :: ChartConfig -> Graph -> ChartSvg
+graphToChartWith cfg g =
   mempty
     & #charts .~ named "edges" ps <> named "shapes" c0 <> named "labels" [ts]
-    & #svgOptions % #svgHeight .~ 500
+    & #svgOptions % #svgHeight .~ (cfg ^. #chartHeight)
     & #hudOptions .~ (mempty & #chartAspect .~ ChartAspect)
   where
     glyphs w = case view (attL NodeType (ID "shape")) g of
-      Just (ID "circle") -> defaultGlyphStyle & #shape .~ CircleGlyph & #size .~ 72 * w & #borderSize .~ 0.5 & #borderColor .~ black & #color .~ transparent
-      Just (ID "box") -> defaultGlyphStyle & #shape .~ RectSharpGlyph (h/w) & #size .~ 72 * w & #borderSize .~ 1 & #borderColor .~ over lightness' (*0.5) (palette1 0) & #color .~ set opac' 0.2 (palette1 0)
+      Just (ID "circle") -> defaultGlyphStyle & #shape .~ CircleGlyph & #size .~ (cfg ^. #chartScale) * w & #borderSize .~ (cfg ^. #edgeSize) & #borderColor .~ (cfg ^. #chartColor) & #color .~ (cfg ^. #chartBackgroundColor)
+      Just (ID "box") -> defaultGlyphStyle & #shape .~ RectSharpGlyph (h/w) & #size .~ 72 * w & #borderSize .~ 1 & #borderColor .~ (cfg ^. #chartColor) & #color .~ (cfg ^. #chartBackgroundColor)
       -- defaults to circle
-      _ -> defaultGlyphStyle & #shape .~ CircleGlyph & #size .~ 72 * w & #borderSize .~ 1 & #borderColor .~ palette1 0 & #color .~ transparent
-    h = maybe 0.5 (runParser_ double . packUTF8 . label) (view (attL NodeType (ID "height")) g)
-    vshift' = -3.7
+      _ -> defaultGlyphStyle & #shape .~ CircleGlyph & #size .~ 72 * w & #borderSize .~ 1 & #borderColor .~ (cfg ^. #chartColor) & #color .~ (cfg ^. #chartBackgroundColor)
+    h = maybe (cfg ^. #nodeHeight) (runParser_ double . packUTF8 . label) (view (attL NodeType (ID "height")) g)
+    vshift' = cfg ^. #vshift
     -- node information
-    ns = nodeInfo g 0.5
+    ns = nodeInfo g (cfg ^. #nodeSize)
     -- edge information
-    es = edgeInfo g 0.5
+    es = edgeInfo g (cfg ^. #edgeSize)
     -- paths
-    ps = fmap (\(EdgeInfo _ w p) -> PathChart (defaultPathStyle & #borderSize .~ (2 * w) & #borderColor .~ over lightness' (*0.5) (palette1 0) & #color .~ transparent) p) es
+    ps = fmap (\(EdgeInfo _ w p) -> PathChart (defaultPathStyle & #borderSize .~ (2 * w) & #borderColor .~ (cfg ^. #chartColor) & #color .~ transparent) p) es
     -- circles
     c0 = fmap (\(NodeInfo _ w p) -> GlyphChart (glyphs w) [p]) ns
     -- labels
     ts =
-      TextChart (defaultTextStyle & #size .~ 14 & #color .~ over lightness' (*0.5) (palette1 0)) ((\(NodeInfo l _ (Point x y)) -> (labelf l, Point x (vshift' + y))) <$> ns)
+      TextChart (defaultTextStyle & #size .~ (cfg ^. #textSize) & #color .~ (cfg ^. #chartColor)) ((\(NodeInfo l _ (Point x y)) -> ((cfg ^. #labelf) l, Point x (vshift' + y))) <$> ns)
+
+-- | convert a 'Graph' processed via the graphviz commands to a 'ChartSvg' using the default ChartConfig.
+graphToChart :: Graph -> ChartSvg
+graphToChart = graphToChartWith defaultChartConfig

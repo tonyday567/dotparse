@@ -11,6 +11,7 @@ license:       BSD-3-Clause
 homepage:      https://github.com/tonyday567/dotparser#readme
 bug-reports:   https://github.com/tonyday567/dotparser/issues
 build-type:    Simple
+extra-doc-files: other/*.svg
 
 source-repository head
   type:     git

@@ -8,14 +8,12 @@
 module DotParse
  ( module DotParse.Types,
    module DotParse.FlatParse,
-   module FlatParse.Basic
+   module FlatParse.Basic,
+   module NeatInterpolation,
  ) where
 
 import DotParse.Types
 import FlatParse.Basic hiding (cut, lines)
 import DotParse.FlatParse
 import Prelude hiding (replicate)
-
--- $setup
--- >>> import DotParse
--- >>> :set -XOverloadedStrings
+import NeatInterpolation
