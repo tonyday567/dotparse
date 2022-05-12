@@ -86,6 +86,8 @@ module DotParse.Types
     ChartConfig (..),
     defaultChartConfig,
     toStatements,
+    toDotGraph,
+    toDotGraphWith,
   )
 where
 
@@ -869,3 +871,9 @@ graphToChartWith cfg g =
 -- | convert a 'Graph' processed via the graphviz commands to a 'ChartSvg' using the default ChartConfig.
 graphToChart :: Graph -> ChartSvg
 graphToChart = graphToChartWith defaultChartConfig
+
+toDotGraphWith :: Directed -> Graph -> G.Graph ByteString -> Graph
+toDotGraphWith d g gg = g & #directed .~ Last (Just d) & addStatements (toStatements d gg)
+
+toDotGraph :: G.Graph ByteString -> Graph
+toDotGraph = toDotGraphWith Directed defaultGraph
