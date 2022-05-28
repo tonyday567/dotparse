@@ -1,10 +1,13 @@
+{-# OPTIONS_HADDOCK prune #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
--- | Parser & Printer for the dot language of graphviz.
--- http://www.graphviz.org/doc/info/lang.html
+-- | Parser & Printer for the dot language of <http://www.graphviz.org/doc/info/lang.html graphviz>
+--
+-- See "DotParse.Examples" for usage.
+--
 module DotParse
   ( module DotParse.Types,
     module DotParse.FlatParse,

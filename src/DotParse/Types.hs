@@ -872,8 +872,10 @@ graphToChartWith cfg g =
 graphToChart :: Graph -> ChartSvg
 graphToChart = graphToChartWith defaultChartConfig
 
+-- | Convert an algebraic graph to a dotparse graph.
 toDotGraphWith :: Directed -> Graph -> G.Graph ByteString -> Graph
 toDotGraphWith d g gg = g & #directed .~ Last (Just d) & addStatements (toStatements d gg)
 
+-- | Convert an algebraic graph to a dotparse graph, starting with the 'defaultGraph'.
 toDotGraph :: G.Graph ByteString -> Graph
 toDotGraph = toDotGraphWith Directed defaultGraph

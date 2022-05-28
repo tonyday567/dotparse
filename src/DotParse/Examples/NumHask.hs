@@ -223,6 +223,7 @@ dotGraphNH d =
     & attL NodeType (ID "shape") .~ Just (ID "box")
     & gattL (ID "rankdir") .~ Just (IDQuoted "BT")
 
+-- | 'dotGraphNH' after being positionally processed via 'processGraph'
 dotGraphNH' :: Directed -> Graph
 dotGraphNH' d = unsafePerformIO $ processGraph (dotGraphNH d)
 {-# NOINLINE dotGraphNH' #-}

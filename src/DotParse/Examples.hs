@@ -34,6 +34,7 @@ import Prelude hiding (replicate)
 -- * examples
 
 -- | minimal definition
+--
 -- >>> runDotParser ex0 :: Graph
 -- Graph {strict = Last {getLast = Just NoMergeEdges}, directed = Last {getLast = Just UnDirected}, graphid = Last {getLast = Nothing}, nodeAttributes = fromList [], graphAttributes = fromList [], edgeAttributes = fromList [], globalAttributes = fromList [], nodes = [], edges = [], subgraphs = []}
 --
@@ -465,6 +466,7 @@ digraph D {
 }
 |]
 
+-- | Test all the examples
 testAll :: IO ()
 testAll =
   zipWithM_
@@ -492,7 +494,7 @@ testAll =
         <$> [ex0, ex1, ex2, ex3, ex4, ex5, ex6, ex7, ex8, ex9, ex10, ex11, ex12, ex13, ex14, ex15]
     )
 
--- processDotWith :: Directed -> [String] -> ByteString
+-- | Render all the examples
 svgAll :: IO ()
 svgAll =
   zipWithM_
