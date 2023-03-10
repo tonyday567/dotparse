@@ -549,7 +549,7 @@ exGInt =
 
 -- |
 --
--- > exInt = defaultGraph & addStatements (toStatements Directed (packUTF8 . show <$> exGInt))
+-- > exInt = defaultGraph & addStatements (toStatements Directed (strToUtf8 . show <$> exGInt))
 -- > import qualified Data.ByteString.Char8 as B
 -- > g <- processGraph exInt
 -- > B.putStrLn $ dotPrint g
@@ -607,4 +607,4 @@ exGInt =
 --     19 -> 3 [pos="e,277.53,237.38 334.82,116.79 333.41,136.85 329.16,168.62 316.5,192.89 307.11,210.88 290.05,227.04 277.82,237.15"]
 --     }
 exInt :: Graph
-exInt = defaultGraph & addStatements (toStatements Directed (packUTF8 . show <$> exGInt))
+exInt = defaultGraph & addStatements (toStatements Directed (strToUtf8 . show <$> exGInt))

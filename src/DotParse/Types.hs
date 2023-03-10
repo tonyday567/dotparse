@@ -108,7 +108,7 @@ import qualified Data.Text as Text
 import Data.Text.Encoding (encodeUtf8)
 import Data.These
 import DotParse.FlatParse
-import FlatParse.Basic hiding (cut, lines)
+import FlatParse.Basic hiding (cut)
 import GHC.Generics
 import NeatInterpolation
 import Optics.Core
@@ -237,7 +237,7 @@ instance DotParse Strict where
   dotPrint _ MergeEdges = "strict"
   dotPrint _ NoMergeEdges = ""
 
-  dotParse = token $ optioned $(keyword "strict") (const $ pure MergeEdges) (pure NoMergeEdges)
+  dotParse = token $ withOption ($(keyword "strict")) (const $ pure MergeEdges) (pure NoMergeEdges)
 
 -- | Default Strict is NoMergeEdges
 defStrict :: Last Strict -> Strict
@@ -301,8 +301,8 @@ data ID = ID ByteString | IDInt Int | IDDouble Double | IDQuoted ByteString | ID
 
 instance DotParse ID where
   dotPrint _ (ID s) = s
-  dotPrint _ (IDInt i) = packUTF8 (show i)
-  dotPrint _ (IDDouble x) = packUTF8 (show x)
+  dotPrint _ (IDInt i) = strToUtf8 (show i)
+  dotPrint _ (IDDouble x) = strToUtf8 (show x)
   dotPrint _ (IDQuoted x) =
     wrapQuotePrint x
   dotPrint _ (IDHtml s) = s
@@ -312,8 +312,8 @@ instance DotParse ID where
     (ID <$> ident)
       <|> (IDInt <$> (signed int `notFollowedBy` $(char '.')))
       <|> (IDDouble <$> signed double)
-      <|> (IDQuoted . packUTF8 <$> quoted)
-      <|> (IDHtml . packUTF8 <$> htmlLike)
+      <|> (IDQuoted . strToUtf8 <$> quoted)
+      <|> (IDHtml . strToUtf8 <$> htmlLike)
 
 -- | ID as the equivalent plain String
 --
@@ -321,11 +321,11 @@ instance DotParse ID where
 --
 -- > x == y if label x == label y
 label :: ID -> String
-label (ID s) = unpackUTF8 s
+label (ID s) = utf8ToStr s
 label (IDInt i) = show i
 label (IDDouble d) = show d
-label (IDQuoted q) = unpackUTF8 q
-label (IDHtml h) = unpackUTF8 h
+label (IDQuoted q) = utf8ToStr q
+label (IDHtml h) = utf8ToStr h
 
 -- | Attribute key-value pair of identifiers
 --
@@ -609,7 +609,7 @@ processDotWith d args i = do
         UnDirected -> "neato"
   (r, input, e) <- readProcessWithExitCode cmd args i
   bool
-    (error $ unpackUTF8 e)
+    (error $ utf8ToStr e)
     (pure input)
     (r == ExitSuccess)
 
@@ -630,27 +630,27 @@ processGraph g =
 instance DotParse (Point Double) where
   dotPrint _ (Point x y) =
     intercalate "," $
-      packUTF8 . show <$> [x, y]
+      strToUtf8 . show <$> [x, y]
 
   dotParse = token pointP
 
 pointI :: Iso' ID (Point Double)
 pointI =
   iso
-    (runParser_ pointP . packUTF8 . label)
+    (runParser_ pointP . strToUtf8 . label)
     (IDQuoted . dotPrint defaultDotConfig)
 
 instance DotParse (Rect Double) where
   dotPrint _ (Rect x z y w) =
     intercalate "," $
-      packUTF8 . show <$> [x, y, z, w]
+      strToUtf8 . show <$> [x, y, z, w]
 
   dotParse = token rectP
 
 rectI :: Iso' ID (Rect Double)
 rectI =
   iso
-    (runParser_ rectP . packUTF8 . label)
+    (runParser_ rectP . strToUtf8 . label)
     (IDQuoted . dotPrint defaultDotConfig)
 
 -- | Bounding box ID lens
@@ -666,7 +666,8 @@ nodesPortL :: Lens' Graph (Map.Map ID (Maybe Port, Map.Map ID ID))
 nodesPortL =
   lens
     ( \g ->
-        g & view #nodes
+        g
+          & view #nodes
           & fmap (\x -> (view #nodeID x, (view #port x, view #nodeAttrs x)))
           & Map.fromList
     )
@@ -677,7 +678,8 @@ nodesL :: Lens' Graph (Map.Map ID (Map.Map ID ID))
 nodesL =
   lens
     ( \g ->
-        g & view #nodes
+        g
+          & view #nodes
           & fmap (\x -> (view #nodeID x, view #nodeAttrs x))
           & Map.fromList
     )
@@ -702,15 +704,15 @@ setEdges_ :: Graph -> Map.Map (ID, ID) (Map.Map ID ID) -> Graph
 setEdges_ g m =
   g
     & #edges
-    .~ ( ( \((x0, x1), as) ->
-             EdgeStatement
-               (fromDirected (defDirected $ view #directed g))
-               (EdgeID x0 Nothing)
-               (EdgeID x1 Nothing :| [])
-               as
+      .~ ( ( \((x0, x1), as) ->
+               EdgeStatement
+                 (fromDirected (defDirected $ view #directed g))
+                 (EdgeID x0 Nothing)
+                 (EdgeID x1 Nothing :| [])
+                 as
+           )
+             <$> Map.toList m
          )
-           <$> Map.toList m
-       )
 
 -- | A specific attribute for all nodes in a graph
 nodesA :: ID -> Graph -> Map.Map ID (Maybe ID)
@@ -836,10 +838,12 @@ defaultChartConfig = ChartConfig 500 72 0.5 (over lightness' (* 0.5) (palette1 0
 
 -- | convert a 'Graph' processed via the graphviz commands to a 'ChartSvg'
 --
--- >>> import Chart
--- >>> import DotParse.Examples (exInt)
--- >>> ex <- processGraph exInt
--- >>> writeChartSvg "other/ex.svg" (graphToChartWith defaultChartConfig ex)
+-- FIXME: assertion bug
+--
+-- > import Chart
+-- > import DotParse.Examples (exInt)
+-- > ex <- processGraph exInt
+-- > writeChartSvg "other/ex.svg" (graphToChartWith defaultChartConfig ex)
 --
 -- ![Example](other/ex.svg)
 graphToChartWith :: ChartConfig -> Graph -> ChartSvg
@@ -854,7 +858,7 @@ graphToChartWith cfg g =
       Just (ID "box") -> defaultGlyphStyle & #shape .~ RectSharpGlyph (h / w) & #size .~ 72 * w & #borderSize .~ 1 & #borderColor .~ (cfg ^. #chartColor) & #color .~ (cfg ^. #chartBackgroundColor)
       -- defaults to circle
       _ -> defaultGlyphStyle & #shape .~ CircleGlyph & #size .~ 72 * w & #borderSize .~ 1 & #borderColor .~ (cfg ^. #chartColor) & #color .~ (cfg ^. #chartBackgroundColor)
-    h = maybe (cfg ^. #nodeHeight) (runParser_ double . packUTF8 . label) (view (attL NodeType (ID "height")) g)
+    h = maybe (cfg ^. #nodeHeight) (runParser_ double . strToUtf8 . label) (view (attL NodeType (ID "height")) g)
     vshift' = cfg ^. #vshift
     -- node information
     ns = nodeInfo g (cfg ^. #nodeSize)

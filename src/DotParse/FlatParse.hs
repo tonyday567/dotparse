@@ -56,7 +56,7 @@ import qualified Data.ByteString.Char8 as B
 import Data.Char hiding (isDigit)
 import Data.List.NonEmpty
 import DotParse.FlatParse.TH hiding (merge)
-import FlatParse.Basic hiding (cut, lines)
+import FlatParse.Basic hiding (cut)
 import GHC.Generics
 import NumHask.Space
 import Prelude hiding (replicate)
@@ -66,7 +66,7 @@ import Prelude hiding (replicate)
 -- >>> import FlatParse.Basic
 
 -- | Run parser, print pretty error on failure.
-testParser :: Show a => Parser Error a -> ByteString -> IO ()
+testParser :: (Show a) => Parser Error a -> ByteString -> IO ()
 testParser p b =
   case runParser p b of
     Err e -> B.putStrLn $ prettyError b e
@@ -77,14 +77,14 @@ testParser p b =
 runParser_ :: Parser Error a -> ByteString -> a
 runParser_ p b = case runParser p b of
   OK r "" -> r
-  OK _ x -> error $ unpackUTF8 $ "leftovers: " <> x
+  OK _ x -> error $ utf8ToStr $ "leftovers: " <> x
   Fail -> error "Fail"
-  Err e -> error $ unpackUTF8 $ prettyError b e
+  Err e -> error $ utf8ToStr $ prettyError b e
 
 -- * parsing
 
 digit :: Parser Error Int
-digit = (\c -> ord c - ord '0') <$> satisfyASCII isDigit
+digit = (\c -> ord c - ord '0') <$> satisfyAscii isDigit
 
 -- | (unsigned) Int parser
 int :: Parser Error Int
@@ -115,7 +115,7 @@ digits = chainr (\n (!place, !acc) -> (place * 10, acc + place * n)) digit (pure
 double :: Parser Error Double
 double = token do
   (placel, nl) <- digits
-  optioned
+  withOption
     ($(char '.') *> digits)
     ( \(placer, nr) ->
         case (placel, placer) of
@@ -130,14 +130,14 @@ double = token do
 -- |
 -- >>> runParser (signed double) "-1.234x"
 -- OK (-1.234) "x"
-signed :: Num b => Parser e b -> Parser e b
-signed p = optioned $(char '-') (const (((-1) *) <$> p)) p
+signed :: (Num b) => Parser e b -> Parser e b
+signed p = withOption ($(char '-')) (const (((-1) *) <$> p)) p
 
 -- | Looks ahead for a "/"" that may be in the quoted string.
--- >>> runParser quoted (packUTF8 "\"hello\"")
+-- >>> runParser quoted (strToUtf8 "\"hello\"")
 -- OK "hello" ""
 --
--- >>> runParser quoted (packUTF8 "\"hello/\"\"")
+-- >>> runParser quoted (strToUtf8 "\"hello/\"\"")
 -- OK "hello\"" ""
 quoted :: Parser Error String
 quoted =

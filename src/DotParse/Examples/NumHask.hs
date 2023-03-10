@@ -219,7 +219,7 @@ dotGraphNH :: Directed -> Graph
 dotGraphNH d =
   defaultGraph
     & #directed .~ Last (Just d)
-    & addStatements (toStatements d (packUTF8 . show <$> graphNHG))
+    & addStatements (toStatements d (strToUtf8 . show <$> graphNHG))
     & attL NodeType (ID "shape") .~ Just (ID "box")
     & gattL (ID "rankdir") .~ Just (IDQuoted "BT")
 

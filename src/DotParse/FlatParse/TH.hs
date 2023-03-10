@@ -12,6 +12,7 @@ module DotParse.FlatParse.TH where
 
 import Data.ByteString hiding (head, length, reverse)
 import qualified Data.ByteString.Char8 as B
+import Data.Char hiding (isDigit)
 import Data.Functor
 import FlatParse.Basic
 import Language.Haskell.TH
@@ -44,7 +45,7 @@ token p = p <* ws
 -- | Parse a line comment.
 lineComment :: Parser e ()
 lineComment =
-  optioned
+  withOption
     anyWord8
     ( \case
         10 -> ws
@@ -80,8 +81,8 @@ htmlLike = ws *> $(char '<') *> go (1 :: Int) "<"
 -- | First character of a dot identifier.
 isValidStartChar :: Char -> Bool
 isValidStartChar c =
-  ('A' <= c && c <= 'Z')
-    || ('a' <= c && c <= 'z')
+  isAsciiUpper c
+    || isAsciiLower c
     || ('\200' <= c && c <= '\377')
     || (c == '_')
 
@@ -107,18 +108,18 @@ keyword str = [|token ($(string str) `notFollowedBy` identChar)|]
 
 -- | Parser a non-keyword string, throw precise error on failure.
 symbol' :: String -> Q Exp
-symbol' str = [|$(symbol str) `cut'` packUTF8 str|]
+symbol' str = [|$(symbol str) `cut'` strToUtf8 str|]
 
 -- | Parse a keyword string, throw precise error on failure.
 keyword' :: String -> Q Exp
-keyword' str = [|$(keyword str) `cut'` packUTF8 str|]
+keyword' str = [|$(keyword str) `cut'` strToUtf8 str|]
 
 -- | Parse an identifier.
 ident :: Parser e ByteString
 ident =
   token $
     byteStringOf $
-      identStartChar *> many_ identChar
+      identStartChar *> skipMany identChar
 
 -- | Parse an identifier, throw a precise error on failure.
 ident' :: Parser Error ByteString
@@ -165,7 +166,7 @@ prettyError b e =
       ls = B.lines b
       (l, c) = head $ posLineCols b [pos]
       line = if l < length ls then ls !! l else ""
-      linum = packUTF8 $ show l
+      linum = strToUtf8 $ show l
       lpad = B.replicate (B.length linum) ' '
 
       err (Precise _ e) = e
@@ -179,7 +180,10 @@ prettyError b e =
           go [] = ""
           go [e] = " or " <> e
           go (e : es) = ", " <> e <> go es
-   in packUTF8 (show l) <> ":" <> packUTF8 (show c) <> ":\n"
+   in strToUtf8 (show l)
+        <> ":"
+        <> strToUtf8 (show c)
+        <> ":\n"
         <> lpad
         <> "|\n"
         <> linum
