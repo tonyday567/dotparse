@@ -92,7 +92,7 @@ module DotParse.Types
 where
 
 import qualified Algebra.Graph as G
-import Chart
+import Chart hiding (Error, ws, signed, int, double, prettyError, Attribute(..))
 import Control.Monad
 import Data.Bool
 import Data.ByteString hiding (any, empty, filter, head, length, map, zip, zipWith)
@@ -836,21 +836,21 @@ data ChartConfig = ChartConfig
 defaultChartConfig :: ChartConfig
 defaultChartConfig = ChartConfig 500 72 0.5 (over lightness' (* 0.5) (palette1 0)) (set opac' 0.2 (palette1 0)) 0.5 0.5 (-3.7) 14 (Text.pack . label)
 
--- | convert a 'Graph' processed via the graphviz commands to a 'ChartSvg'
+-- | convert a 'Graph' processed via the graphviz commands to a 'ChartOptions'
 --
 -- FIXME: assertion bug
 --
 -- > import Chart
 -- > import DotParse.Examples (exInt)
 -- > ex <- processGraph exInt
--- > writeChartSvg "other/ex.svg" (graphToChartWith defaultChartConfig ex)
+-- > writeChartOptions "other/ex.svg" (graphToChartWith defaultChartConfig ex)
 --
 -- ![Example](other/ex.svg)
-graphToChartWith :: ChartConfig -> Graph -> ChartSvg
+graphToChartWith :: ChartConfig -> Graph -> ChartOptions
 graphToChartWith cfg g =
   mempty
     & #charts .~ named "edges" ps <> named "shapes" c0 <> named "labels" [ts]
-    & #svgOptions % #svgHeight .~ (cfg ^. #chartHeight)
+    & #markupOptions % #markupHeight .~ (cfg ^. #chartHeight)
     & #hudOptions .~ (mempty & #chartAspect .~ ChartAspect)
   where
     glyphs w = case view (attL NodeType (ID "shape")) g of
@@ -872,8 +872,8 @@ graphToChartWith cfg g =
     ts =
       TextChart (defaultTextStyle & #size .~ (cfg ^. #textSize) & #color .~ (cfg ^. #chartColor)) ((\(NodeInfo l _ (Point x y)) -> ((cfg ^. #labelf) l, Point x (vshift' + y))) <$> ns)
 
--- | convert a 'Graph' processed via the graphviz commands to a 'ChartSvg' using the default ChartConfig.
-graphToChart :: Graph -> ChartSvg
+-- | convert a 'Graph' processed via the graphviz commands to a 'ChartOptions' using the default ChartConfig.
+graphToChart :: Graph -> ChartOptions
 graphToChart = graphToChartWith defaultChartConfig
 
 -- | Convert an algebraic graph to a dotparse graph.

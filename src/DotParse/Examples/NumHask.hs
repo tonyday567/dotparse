@@ -13,7 +13,7 @@
 module DotParse.Examples.NumHask where
 
 import qualified Algebra.Graph as G
-import Chart
+import Chart hiding (Attribute(..))
 import Data.Bifunctor
 import qualified Data.Map.Strict as Map
 import Data.Monoid
@@ -239,8 +239,8 @@ toLink i = [trimming|<a href="https://hackage.haskell.org/package/numhask/docs/$
 
 -- | A chart-svg chart with label links
 --
--- > writeChartSvg "other/nh.svg" (graphToChart toLink (dotGraphNH' Directed))
+-- > writeChartOptions "other/nh.svg" (graphToChart toLink (dotGraphNH' Directed))
 --
 -- ![NumHask Example](other/nh.svg)
 writeNHChart :: IO ()
-writeNHChart = writeChartSvg "other/nh.svg" (graphToChartWith (defaultChartConfig & #labelf .~ toLink) (dotGraphNH' Directed))
+writeNHChart = writeChartOptions "other/nh.svg" (graphToChartWith (defaultChartConfig & #labelf .~ toLink) (dotGraphNH' Directed))

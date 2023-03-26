@@ -47,3 +47,32 @@ Steal design ideas from [[https://hackage.haskell.org/package/jordan][jordan]].
 Case-insensitive parsing blocked on [[https://github.com/AndrasKovacs/flatparse/issues/10][AndrasKovacs/flatparse#10 Case-insensitive keyword matching]].
 
 Exact printing of comments and whitespace.
+
+* Development
+
+#+begin_src haskell :results output
+:reload
+:set prompt "> "
+:set -XOverloadedLabels
+:set -XOverloadedStrings
+import Chart
+import Optics.Core
+import FlatParse.Basic
+import qualified Data.ByteString as BS
+import GHC.Exts
+import DotParse.Examples
+import DotParse.Examples.NumHask
+#+end_src
+
+#+RESULTS:
+: Ok, 14 modules loaded.
+: >
+
+** write examples
+
+  #+begin_src haskell
+writeAllExamples
+  #+end_src
+
+#+RESULTS:
+: ok

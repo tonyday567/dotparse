@@ -13,7 +13,7 @@ description:     This package provides parsing and printing of the dot language.
   >>> import Chart
   >>> import DotParse.Examples (exInt)
   >>> ex <- processGraph exInt
-  >>> writeChartSvg "other/ex.svg" (graphToChartWith defaultChartConfig ex)
+  >>> writeChartOptions "other/ex.svg" (graphToChartWith defaultChartConfig ex)
   .
   ![usage example](docs/other/ex.svg)
   .
@@ -43,7 +43,7 @@ library
     , algebraic-graphs    >=0.6 && <0.8
     , base                >=4.7    && <5
     , bytestring          ^>=0.11.3
-    , chart-svg           ^>=0.3
+    , chart-svg           >=0.3 && < 0.5
     , containers          ^>=0.6
     , flatparse           >=0.3.2 && <0.5
     , neat-interpolation  ^>=0.5.1
