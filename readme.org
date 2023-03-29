@@ -2,6 +2,8 @@
 
 [[https://hackage.haskell.org/package/chart-svg][file:https://img.shields.io/hackage/v/dotparse.svg]] [[https://github.com/tonyday567/chart-svg/actions?query=workflow%3Ahaskell-ci][file:https://github.com/tonyday567/dotparse/workflows/haskell-ci/badge.svg]]
 
+* Introduction
+
 Parsing and printing for the dot language of graphviz.
 
 - A close rendition of the [[http://www.graphviz.org/doc/info/lang.html][dot language specification]]
@@ -48,6 +50,238 @@ Case-insensitive parsing blocked on [[https://github.com/AndrasKovacs/flatparse/
 
 Exact printing of comments and whitespace.
 
+* process pipelines
+
+** algebraic-graphs
+Starting with a Graph from algebraic-graphs:
+
+#+begin_src haskell
+import qualified Algebra.Graph as G
+:{
+exAGraph :: G.Graph Int
+exAGraph =
+  G.edges $
+    [(v, (v + 1) `mod` 6) | v <- [0 .. 5]]
+      <> [(v, v + k) | v <- [0 .. 5], k <- [6, 12]]
+      <> [(2, 18), (2, 19), (15, 18), (15, 19), (18, 3), (19, 3)]
+:}
+#+end_src
+
+#+RESULTS:
+: ghci| ghci| ghci| ghci| ghci| ghci| ghci|
+
+#+begin_src haskell
+exAGraph
+#+end_src
+
+#+RESULTS:
+: Overlay (Connect (Vertex 0) (Vertex 1)) (Overlay (Connect (Vertex 1) (Vertex 2)) (Overlay (Connect (Vertex 2) (Vertex 3)) (Overlay (Connect (Vertex 3) (Vertex 4)) (Overlay (Connect (Vertex 4) (Vertex 5)) (Overlay (Connect (Vertex 5) (Vertex 0)) (Overlay (Connect (Vertex 0) (Vertex 6)) (Overlay (Connect (Vertex 0) (Vertex 12)) (Overlay (Connect (Vertex 1) (Vertex 7)) (Overlay (Connect (Vertex 1) (Vertex 13)) (Overlay (Connect (Vertex 2) (Vertex 8)) (Overlay (Connect (Vertex 2) (Vertex 14)) (Overlay (Connect (Vertex 3) (Vertex 9)) (Overlay (Connect (Vertex 3) (Vertex 15)) (Overlay (Connect (Vertex 4) (Vertex 10)) (Overlay (Connect (Vertex 4) (Vertex 16)) (Overlay (Connect (Vertex 5) (Vertex 11)) (Overlay (Connect (Vertex 5) (Vertex 17)) (Overlay (Connect (Vertex 2) (Vertex 18)) (Overlay (Connect (Vertex 2) (Vertex 19)) (Overlay (Connect (Vertex 15) (Vertex 18)) (Overlay (Connect (Vertex 15) (Vertex 19)) (Overlay (Connect (Vertex 18) (Vertex 3)) (Connect (Vertex 19) (Vertex 3))))))))))))))))))))))))
+
+** dotparse Graph
+
+Convert to a dotparse Graph
+
+#+begin_src haskell
+exGraph = defaultGraph & addStatements (toStatements Directed (Char8.pack . show <$> exAGraph))
+#+end_src
+
+** dotPrint
+
+Encode graph as a ByteString (prior to processing via graphviz)
+
+#+begin_src haskell :results output
+BS.putStr (dotPrint defaultDotConfig exGraph)
+#+end_src
+
+#+RESULTS:
+#+begin_example
+digraph {
+    node [height=0.5;shape=circle]
+    graph [overlap=false;size="1!";splines=spline]
+    edge [arrowsize=0.5]
+    "9"
+    "8"
+    "7"
+    "6"
+    "5"
+    "4"
+    "3"
+    "2"
+    "19"
+    "18"
+    "17"
+    "16"
+    "15"
+    "14"
+    "13"
+    "12"
+    "11"
+    "10"
+    "1"
+    "0"
+    "5" -> "17"
+    "5" -> "11"
+    "5" -> "0"
+    "4" -> "5"
+    "4" -> "16"
+    "4" -> "10"
+    "3" -> "9"
+    "3" -> "4"
+    "3" -> "15"
+    "2" -> "8"
+    "2" -> "3"
+    "2" -> "19"
+    "2" -> "18"
+    "2" -> "14"
+    "19" -> "3"
+    "18" -> "3"
+    "15" -> "19"
+    "15" -> "18"
+    "1" -> "7"
+    "1" -> "2"
+    "1" -> "13"
+    "0" -> "6"
+    "0" -> "12"
+    "0" -> "1"
+    }
+#+end_example
+
+** processDotWith
+
+Directly create an SVG from the dotparse Graph
+
+#+begin_src haskell :file other/exdirect.svg :results output graphics file :exports both
+(\b f -> processDotWith Directed ["-Tsvg", "-o", "other/" <> f <> ".svg"] b) (dotPrint defaultDotConfig exGraph) "exdirect"
+        #+end_src
+
+#+RESULTS:
+[[file:other/exdirect.svg]]
+
+** processDot
+
+ByteString of the processed Graph
+
+        #+begin_src haskell :results output
+BS.putStr =<< processDot Directed (dotPrint defaultDotConfig exInt)
+        #+end_src
+
+#+RESULTS:
+#+begin_example
+digraph {
+	graph [bb="0,0,428.5,482.98",
+		overlap=false,
+		size="1!",
+		splines=spline
+	];
+	node [height=0.5,
+		label="\N",
+		shape=circle
+	];
+	edge [arrowsize=0.5];
+	9	[pos="18,392.98",
+		width=0.5];
+	8	[pos="265,19.498",
+		width=0.5];
+	7	[pos="354,94.495",
+		width=0.5];
+	6	[pos="272,169.49",
+		width=0.5];
+	5	[pos="271,319.48",
+		width=0.5];
+	17	[height=0.54162,
+		pos="243,244.49",
+		width=0.54162];
+	5 -> 17	[pos="e,249.78,263.18 264.79,302.28 261.03,292.5 256.19,279.87 252.02,269"];
+	11	[height=0.54162,
+		pos="300,244.49",
+		width=0.54162];
+	5 -> 11	[pos="e,292.97,263.18 277.44,302.28 281.32,292.5 286.34,279.87 290.66,269"];
+	0	[pos="355,244.49",
+		width=0.5];
+	5 -> 0	[pos="e,341.69,257.05 284.12,307.08 298.34,294.72 321.12,274.93 337,261.13"];
+	4	[pos="298,392.98",
+		width=0.5];
+	4 -> 5	[pos="e,277.1,336.64 291.87,375.76 288.18,365.98 283.42,353.38 279.38,342.69"];
+	16	[height=0.54162,
+		pos="326,319.48",
+		width=0.54162];
+	4 -> 16	[pos="e,319.08,338.15 304.35,375.76 308.02,366.39 312.7,354.44 316.77,344.05"];
+	10	[height=0.54162,
+		pos="383,319.48",
+		width=0.54162];
+	4 -> 10	[pos="e,368.39,332.78 311.28,380.81 325.33,368.99 347.63,350.23 363.64,336.77"];
+	3	[pos="138,464.98",
+		width=0.5];
+	3 -> 9	[pos="e,33.454,403 122.8,455.12 101.55,442.72 62.873,420.16 38.915,406.18"];
+	3 -> 4	[pos="e,281.81,401.07 154.52,456.76 183.53,444.06 243.64,417.77 276.08,403.57"];
+	15	[height=0.54162,
+		pos="111,94.495",
+		width=0.54162];
+	3 -> 15	[pos="e,111.83,114.18 133.57,447.33 126.88,420.73 115,366.91 115,320.48 115,320.48 115,320.48 115,243.49 115,200.24 113.27,149.9 112.09,\
+120.48"];
+	2	[pos="207,94.495",
+		width=0.5];
+	2 -> 8	[pos="e,254.14,34.167 217.91,79.765 227.06,68.243 240.22,51.683 250.3,38.994"];
+	2 -> 3	[pos="e,148.5,450.26 204.88,112.78 201.68,140.37 196,196.08 196,243.49 196,320.48 196,320.48 196,320.48 196,362.1 188.77,372.9 172,410.98 \
+166.72,422.97 158.94,435.35 152.15,445.12"];
+	19	[height=0.54162,
+		pos="96,19.498",
+		width=0.54162];
+	2 -> 19	[pos="e,112.17,31.132 192.03,83.65 172.83,71.022 139.39,49.034 117.48,34.622"];
+	18	[height=0.54162,
+		pos="153,19.498",
+		width=0.54162];
+	2 -> 18	[pos="e,164.31,35.79 196.59,79.42 188.49,68.473 177.14,53.13 168.05,40.846"];
+	14	[height=0.54162,
+		pos="210,19.498",
+		width=0.54162];
+	2 -> 14	[pos="e,209.22,39.467 207.71,76.196 208.08,67.134 208.55,55.866 208.96,45.841"];
+	19 -> 3	[pos="e,126.11,451.28 89.678,38.002 80.352,65.432 64,120.39 64,168.49 64,320.48 64,320.48 64,320.48 64,370.68 100.2,420.86 121.97,446.49"];
+	18 -> 3	[pos="e,141.86,447.3 154.04,39.181 155.5,67.246 158,121.96 158,168.49 158,320.48 158,320.48 158,320.48 158,363.33 149.14,412.69 143.22,\
+440.93"];
+	15 -> 19	[pos="e,99.784,38.912 107.21,75.075 105.35,65.997 103.07,54.924 101.06,45.13"];
+	15 -> 18	[pos="e,143.51,36.997 120.53,76.931 126.38,66.758 133.95,53.604 140.31,42.556"];
+	13	[height=0.54162,
+		pos="409,94.495",
+		width=0.54162];
+	12	[height=0.54162,
+		pos="327,169.49",
+		width=0.54162];
+	1	[pos="382,169.49",
+		width=0.5];
+	1 -> 7	[pos="e,360.2,111.65 375.79,152.29 371.87,142.08 366.76,128.77 362.48,117.6"];
+	1 -> 2	[pos="e,224.45,100.38 367.84,157.82 363.81,155.06 359.34,152.24 355,149.99 312.98,128.29 260.29,111.07 230.46,102.16"];
+	1 -> 13	[pos="e,402.46,113.18 387.99,152.29 391.61,142.51 396.28,129.88 400.3,119.01"];
+	0 -> 6	[pos="e,285.3,182.19 341.66,231.76 327.63,219.41 305.45,199.91 289.9,186.23"];
+	0 -> 12	[pos="e,333.78,188.18 348.79,227.29 345.03,217.51 340.19,204.87 336.02,194.01"];
+	0 -> 1	[pos="e,375.93,186.9 360.99,227.29 364.74,217.15 369.62,203.95 373.74,192.83"];
+}
+#+end_example
+
+** processGraph
+
+Graph augmented by graphviz
+
+#+begin_src haskell
+exGraphAugmented <- processGraph exGraph
+:t exGraphAugmented
+#+end_src
+
+#+RESULTS:
+: exGraphAugmented :: Graph
+
+** graphToChartWith
+
+SVG production via chart-svg
+
+#+begin_src haskell :file other/exga.svg :results output graphics file :exports both
+import Chart (writeChartOptions)
+writeChartOptions "other/exga.svg" (graphToChartWith defaultChartConfig exGraphAugmented)
+#+end_src
+
+#+RESULTS:
+[[file:other/exga.svg]]
+
 * Development
 
 #+begin_src haskell :results output
@@ -55,24 +289,91 @@ Exact printing of comments and whitespace.
 :set prompt "> "
 :set -XOverloadedLabels
 :set -XOverloadedStrings
+:set -Wno-type-defaults
+:set -XImportQualifiedPost
 import Chart
 import Optics.Core
-import FlatParse.Basic
+import FlatParse.Basic qualified as FP
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as Char8
 import GHC.Exts
+import DotParse
 import DotParse.Examples
 import DotParse.Examples.NumHask
+import Data.Proxy
+print "ok"
 #+end_src
 
 #+RESULTS:
-: Ok, 14 modules loaded.
+: Ok, six modules loaded.
 : >
+: >
+: ok
 
 ** write examples
 
+Round-trip test
+
+#+begin_src haskell :results output
+testAll
+#+end_src
+
+#+RESULTS:
+#+begin_example
+ex0
+ex1
+ex2
+ex3
+ex4
+ex5
+ex6
+ex7
+ex8
+ex9
+ex10
+ex11
+ex12
+ex13
+ex14
+ex15
+#+end_example
+
+Render examples
+
+#+begin_src haskell
+svgAll
+#+end_src
+
+#+RESULTS:
+#+begin_example
+ex0
+ex1
+ex2
+ex3
+ex4
+ex5
+ex6
+ex7
+ex8
+ex9
+ex10
+ex11
+ex12
+ex13
+ex14
+ex15
+#+end_example
+
+*** numhask example
+
   #+begin_src haskell
-writeAllExamples
+writeNHChart
   #+end_src
 
 #+RESULTS:
-: ok
+
+#+begin_src haskell
+writeChartOptions "other/nh.svg" (graphToChart toLink (dotGraphNH' Directed))
+#+end_src
+
+#+RESULTS:

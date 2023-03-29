@@ -13,7 +13,7 @@
 module DotParse.Examples.NumHask where
 
 import qualified Algebra.Graph as G
-import Chart hiding (Attribute(..))
+import Chart ( writeChartOptions )
 import Data.Bifunctor
 import qualified Data.Map.Strict as Map
 import Data.Monoid
@@ -22,6 +22,8 @@ import DotParse
 import GHC.IO.Unsafe
 import Optics.Core
 import Prelude hiding (replicate)
+import Data.String.Interpolate
+import FlatParse.Basic
 
 -- $setup
 -- >>> import DotParse
@@ -229,12 +231,12 @@ dotGraphNH' d = unsafePerformIO $ processGraph (dotGraphNH d)
 {-# NOINLINE dotGraphNH' #-}
 
 -- | Convert a node ID to a label for chart-svg charts
---
+-- FIXME: check this is still working
 -- Doing this directly in dot doesn't quite work because the engines get the width of the link wrong.
 toLink :: ID -> Text
-toLink i = [trimming|<a href="https://hackage.haskell.org/package/numhask/docs/$m.html#t:$t">$t</a>|]
+toLink id_ =[i|<a href="https://hackage.haskell.org/package/numhask/docs/#{m}.html:#{t}">#{t}</a>|]
   where
-    t = pack (label i)
+    t = pack (label id_)
     m = Map.fromList (first (pack . show) <$> classesModule) Map.! t
 
 -- | A chart-svg chart with label links

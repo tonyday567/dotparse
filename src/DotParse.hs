@@ -8,15 +8,55 @@
 --
 -- See "DotParse.Examples" for usage.
 module DotParse
-  ( module DotParse.Types,
-    module DotParse.FlatParse,
-    module FlatParse.Basic,
-    module NeatInterpolation,
+  (
+    DotConfig(..),
+    defaultDotConfig,
+    DotParse (..),
+    testDotParser,
+    runDotParser,
+
+    Graph (..),
+    defaultGraph,
+    attL,
+    gattL,
+    processDot,
+    processDotWith,
+    processGraph,
+    processGraphWith,
+
+    Strict(..),
+    defStrict,
+    Directed(..),
+    defDirected,
+    ID(..),
+    label,
+    Compass (..),
+    Port (..),
+    AttributeType (..),
+    AttributeStatement (..),
+    NodeStatement (..),
+    EdgeID (..),
+    EdgeOp (..),
+    fromDirected,
+    EdgeStatement (..),
+    edgeID,
+    edgeIDs,
+    edgeIDsNamed,
+    Statement (..),
+    addStatement,
+    addStatements,
+    SubGraphStatement (..),
+
+    -- * Conversion
+    graphToChartWith,
+    graphToChart,
+    ChartConfig (..),
+    defaultChartConfig,
+    toStatements,
+    toDotGraph,
+    toDotGraphWith,
+
   )
 where
 
-import DotParse.FlatParse
 import DotParse.Types
-import FlatParse.Basic hiding (cut)
-import NeatInterpolation
-import Prelude hiding (replicate)

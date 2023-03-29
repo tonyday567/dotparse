@@ -51,6 +51,7 @@ library
     , numhask-space       ^>=0.10
     , optics-core         ^>=0.4
     , process-extras      ^>=0.7.4
+    , string-interpolate ^>=0.3
     , template-haskell    >=2.16 && < 2.20
     , text                >=1.2 && <2.1
     , these               ^>=1.1.1

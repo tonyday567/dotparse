@@ -92,7 +92,7 @@ module DotParse.Types
 where
 
 import qualified Algebra.Graph as G
-import Chart hiding (Error, ws, signed, int, double, prettyError, Attribute(..))
+import Chart
 import Control.Monad
 import Data.Bool
 import Data.ByteString hiding (any, empty, filter, head, length, map, zip, zipWith)
@@ -105,20 +105,21 @@ import Data.Monoid
 import Data.Proxy
 import Data.Text (Text)
 import qualified Data.Text as Text
-import Data.Text.Encoding (encodeUtf8)
 import Data.These
 import DotParse.FlatParse
 import FlatParse.Basic hiding (cut)
 import GHC.Generics
-import NeatInterpolation
 import Optics.Core
 import System.Exit
 import System.Process.ByteString
 import Prelude hiding (replicate)
+import Data.String.Interpolate
 
 -- $setup
 -- >>> import DotParse
 -- >>> import qualified Data.Map as Map
+-- >>> import qualified FlatParse.Basic as FP
+-- >>> import FlatParse.Basic (runParser, Result)
 -- >>> :set -XOverloadedStrings
 
 -- | printing options, for separators.
@@ -440,9 +441,11 @@ data AttributeStatement = AttributeStatement {attributeType :: AttributeType, at
 
 instance DotParse AttributeStatement where
   dotPrint cfg (AttributeStatement t as) =
-    intercalate
+    bool
+    (intercalate
       " "
-      [dotPrint cfg t, dotPrint cfg as]
+      [dotPrint cfg t, dotPrint cfg as])
+    mempty (mempty == as)
 
   dotParse = AttributeStatement <$> dotParse <*> dotParse
 
@@ -577,15 +580,14 @@ addStatements ss g = Prelude.foldr addStatement g ss
 -- | default dot graph as a ByteString
 defaultBS :: ByteString
 defaultBS =
-  encodeUtf8
-    [trimming|
+    [i|
 digraph {
     node [shape=circle
          ,height=0.5];
     graph [overlap=false
           ,splines=spline
           ,size="1!"];
-    edge [arrowsize=0];
+    edge [arrowsize=0.5];
   }
 |]
 
