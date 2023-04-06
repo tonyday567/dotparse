@@ -105,20 +105,21 @@ import Data.Monoid
 import Data.Proxy
 import Data.Text (Text)
 import qualified Data.Text as Text
-import Data.Text.Encoding (encodeUtf8)
 import Data.These
 import DotParse.FlatParse
 import FlatParse.Basic hiding (cut)
 import GHC.Generics
-import NeatInterpolation
 import Optics.Core
 import System.Exit
 import System.Process.ByteString
 import Prelude hiding (replicate)
+import Data.String.Interpolate
 
 -- $setup
 -- >>> import DotParse
 -- >>> import qualified Data.Map as Map
+-- >>> import qualified FlatParse.Basic as FP
+-- >>> import FlatParse.Basic (runParser, Result)
 -- >>> :set -XOverloadedStrings
 
 -- | printing options, for separators.
@@ -440,9 +441,11 @@ data AttributeStatement = AttributeStatement {attributeType :: AttributeType, at
 
 instance DotParse AttributeStatement where
   dotPrint cfg (AttributeStatement t as) =
-    intercalate
+    bool
+    (intercalate
       " "
-      [dotPrint cfg t, dotPrint cfg as]
+      [dotPrint cfg t, dotPrint cfg as])
+    mempty (mempty == as)
 
   dotParse = AttributeStatement <$> dotParse <*> dotParse
 
@@ -577,15 +580,14 @@ addStatements ss g = Prelude.foldr addStatement g ss
 -- | default dot graph as a ByteString
 defaultBS :: ByteString
 defaultBS =
-  encodeUtf8
-    [trimming|
+    [i|
 digraph {
     node [shape=circle
          ,height=0.5];
     graph [overlap=false
           ,splines=spline
           ,size="1!"];
-    edge [arrowsize=0];
+    edge [arrowsize=0.5];
   }
 |]
 
@@ -596,7 +598,7 @@ digraph {
 -- digraph {
 --     node [height=0.5;shape=circle]
 --     graph [overlap=false;size="1!";splines=spline]
---     edge [arrowsize=0]
+--     edge [arrowsize=0.5]
 --     }
 defaultGraph :: Graph
 defaultGraph = runDotParser defaultBS
@@ -836,21 +838,13 @@ data ChartConfig = ChartConfig
 defaultChartConfig :: ChartConfig
 defaultChartConfig = ChartConfig 500 72 0.5 (over lightness' (* 0.5) (palette1 0)) (set opac' 0.2 (palette1 0)) 0.5 0.5 (-3.7) 14 (Text.pack . label)
 
--- | convert a 'Graph' processed via the graphviz commands to a 'ChartSvg'
+-- | convert a 'Graph' processed via the graphviz commands to a 'ChartOptions'
 --
--- FIXME: assertion bug
---
--- > import Chart
--- > import DotParse.Examples (exInt)
--- > ex <- processGraph exInt
--- > writeChartSvg "other/ex.svg" (graphToChartWith defaultChartConfig ex)
---
--- ![Example](other/ex.svg)
-graphToChartWith :: ChartConfig -> Graph -> ChartSvg
+graphToChartWith :: ChartConfig -> Graph -> ChartOptions
 graphToChartWith cfg g =
   mempty
     & #charts .~ named "edges" ps <> named "shapes" c0 <> named "labels" [ts]
-    & #svgOptions % #svgHeight .~ (cfg ^. #chartHeight)
+    & #markupOptions % #markupHeight .~ (cfg ^. #chartHeight)
     & #hudOptions .~ (mempty & #chartAspect .~ ChartAspect)
   where
     glyphs w = case view (attL NodeType (ID "shape")) g of
@@ -872,8 +866,8 @@ graphToChartWith cfg g =
     ts =
       TextChart (defaultTextStyle & #size .~ (cfg ^. #textSize) & #color .~ (cfg ^. #chartColor)) ((\(NodeInfo l _ (Point x y)) -> ((cfg ^. #labelf) l, Point x (vshift' + y))) <$> ns)
 
--- | convert a 'Graph' processed via the graphviz commands to a 'ChartSvg' using the default ChartConfig.
-graphToChart :: Graph -> ChartSvg
+-- | convert a 'Graph' processed via the graphviz commands to a 'ChartOptions' using the default ChartConfig.
+graphToChart :: Graph -> ChartOptions
 graphToChart = graphToChartWith defaultChartConfig
 
 -- | Convert an algebraic graph to a dotparse graph.

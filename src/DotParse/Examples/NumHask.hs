@@ -22,6 +22,8 @@ import DotParse
 import GHC.IO.Unsafe
 import Optics.Core
 import Prelude hiding (replicate)
+import Data.String.Interpolate
+import FlatParse.Basic
 
 -- $setup
 -- >>> import DotParse
@@ -229,18 +231,17 @@ dotGraphNH' d = unsafePerformIO $ processGraph (dotGraphNH d)
 {-# NOINLINE dotGraphNH' #-}
 
 -- | Convert a node ID to a label for chart-svg charts
---
 -- Doing this directly in dot doesn't quite work because the engines get the width of the link wrong.
 toLink :: ID -> Text
-toLink i = [trimming|<a href="https://hackage.haskell.org/package/numhask/docs/$m.html#t:$t">$t</a>|]
+toLink id_ =[i|<a href="https://hackage.haskell.org/package/numhask/docs/#{m}.html\#t:#{t}">#{t}</a>|]
   where
-    t = pack (label i)
+    t = pack (label id_)
     m = Map.fromList (first (pack . show) <$> classesModule) Map.! t
 
 -- | A chart-svg chart with label links
 --
--- > writeChartSvg "other/nh.svg" (graphToChart toLink (dotGraphNH' Directed))
+-- > writeChartOptions "other/nh.svg" (graphToChart toLink (dotGraphNH' Directed))
 --
 -- ![NumHask Example](other/nh.svg)
 writeNHChart :: IO ()
-writeNHChart = writeChartSvg "other/nh.svg" (graphToChartWith (defaultChartConfig & #labelf .~ toLink) (dotGraphNH' Directed))
+writeNHChart = writeChartOptions "other/nh.svg" (graphToChartWith (defaultChartConfig & #labelf .~ toLink) (dotGraphNH' Directed))
