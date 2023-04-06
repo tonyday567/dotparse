@@ -598,7 +598,7 @@ digraph {
 -- digraph {
 --     node [height=0.5;shape=circle]
 --     graph [overlap=false;size="1!";splines=spline]
---     edge [arrowsize=0]
+--     edge [arrowsize=0.5]
 --     }
 defaultGraph :: Graph
 defaultGraph = runDotParser defaultBS
@@ -840,14 +840,6 @@ defaultChartConfig = ChartConfig 500 72 0.5 (over lightness' (* 0.5) (palette1 0
 
 -- | convert a 'Graph' processed via the graphviz commands to a 'ChartOptions'
 --
--- FIXME: assertion bug
---
--- > import Chart
--- > import DotParse.Examples (exInt)
--- > ex <- processGraph exInt
--- > writeChartOptions "other/ex.svg" (graphToChartWith defaultChartConfig ex)
---
--- ![Example](other/ex.svg)
 graphToChartWith :: ChartConfig -> Graph -> ChartOptions
 graphToChartWith cfg g =
   mempty

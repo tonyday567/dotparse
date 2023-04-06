@@ -31,6 +31,9 @@ import Data.String.Interpolate
 -- >>> import Data.Proxy
 -- >>> :set -XOverloadedStrings
 -- >>> import Data.String.Interpolate
+-- >>> import qualified Data.ByteString.Char8 as Char8
+-- >>> import Optics.Core
+-- >>> import Chart
 
 -- * examples
 
