@@ -1,6 +1,6 @@
 cabal-version:   2.4
 name:            dotparse
-version:         0.0.1
+version:         0.0.2
 synopsis:        dot language parsing and printing.
 description:     This package provides parsing and printing of the dot language.
 
