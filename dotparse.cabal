@@ -46,7 +46,7 @@ library
     , chart-svg           >=0.3 && < 0.5
     , containers          ^>=0.6
     , flatparse           >=0.3.2 && <0.5
-    , numhask-space       ^>=0.10
+    , numhask-space       >=0.10 && <0.12
     , optics-core         ^>=0.4
     , process-extras      ^>=0.7.4
     , string-interpolate ^>=0.3
