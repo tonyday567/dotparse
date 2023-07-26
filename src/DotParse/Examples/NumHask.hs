@@ -1,13 +1,6 @@
-{-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE BlockArguments #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
-{-# HLINT ignore "Use ?~" #-}
 
 -- | Example of Dot graph construction for the NumHask class heirarchy.
 module DotParse.Examples.NumHask where
@@ -58,7 +51,7 @@ data Class
   | SubtractiveAction
   | MultiplicativeAction
   | DivisiveAction
-  | Module
+  | Actions
   | -- Lattice
     JoinSemiLattice
   | MeetSemiLattice
@@ -69,9 +62,7 @@ data Class
   | -- Number Types
     Integral
   | Ratio
-  | -- Measure
-    Signed
-  | Norm
+  -- Measure
   | Basis
   | Direction
   | Epsilon
@@ -134,8 +125,7 @@ dependencies =
     Dependency SubtractiveAction Subtractive (Just Actor),
     Dependency MultiplicativeAction Multiplicative (Just Actor),
     Dependency DivisiveAction Divisive (Just Actor),
-    Dependency Module Distributive (Just Actor),
-    Dependency Module MultiplicativeAction Nothing,
+    Dependency Actions Distributive (Just Actor),
     -- Lattice
     Dependency JoinSemiLattice Associative Nothing,
     Dependency JoinSemiLattice Commutative Nothing,
@@ -151,10 +141,8 @@ dependencies =
     Dependency BoundedMeetSemiLattice Unital Nothing,
     Dependency BoundedLattice BoundedJoinSemiLattice Nothing,
     Dependency BoundedLattice BoundedMeetSemiLattice Nothing,
-    Dependency Signed Ring Nothing,
-    Dependency Norm Ring Nothing,
-    Dependency Basis Ring Nothing,
-    Dependency Direction Ring Nothing,
+    Dependency Basis Distributive Nothing,
+    Dependency Direction Distributive Nothing,
     Dependency Epsilon Subtractive Nothing,
     Dependency Epsilon MeetSemiLattice Nothing,
     Dependency Integral Ring Nothing,
@@ -173,13 +161,9 @@ classesNH =
     ExpField,
     QuotientField,
     TrigField,
-    Signed,
-    Norm,
+    Basis,
     Direction,
-    MultiplicativeAction,
-    Module,
-    UpperBoundedField,
-    LowerBoundedField,
+    Actions,
     Integral,
     Ratio
   ]
@@ -196,11 +180,9 @@ classesModule =
     (ExpField, "NumHask-Algebra-Field"),
     (QuotientField, "NumHask-Algebra-Field"),
     (TrigField, "NumHask-Algebra-Field"),
-    (Signed, "NumHask-Algebra-Metric"),
-    (Norm, "NumHask-Algebra-Metric"),
+    (Basis, "NumHask-Algebra-Metric"),
     (Direction, "NumHask-Algebra-Metric"),
-    (MultiplicativeAction, "NumHask-Algebra-Module"),
-    (Module, "NumHask-Algebra-Module"),
+    (Actions, "NumHask-Algebra-Action"),
     (UpperBoundedField, "NumHask-Algebra-Field"),
     (LowerBoundedField, "NumHask-Algebra-Field"),
     (Integral, "NumHask-Data-Integral"),
@@ -244,4 +226,5 @@ toLink id_ =[i|<a href="https://hackage.haskell.org/package/numhask/docs/#{m}.ht
 --
 -- ![NumHask Example](other/nh.svg)
 writeNHChart :: IO ()
-writeNHChart = writeChartOptions "other/nh.svg" (graphToChartWith (defaultChartConfig & #labelf .~ toLink) (dotGraphNH' Directed))
+writeNHChart = writeChartOptions "other/nh.svg" (graphToChartWith (defaultChartConfig & #labelf .~ toLink & #chartColor .~ over lightness' (* 0.5) (palette1 2) & #chartBackgroundColor .~ set opac' 0.1 (palette1 1)) (dotGraphNH' Directed))
+  -- writeChartOptions "other/nh.svg" (graphToChartWith (defaultChartConfig & #labelf .~ toLink) (dotGraphNH' Directed))

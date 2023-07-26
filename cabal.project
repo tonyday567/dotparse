@@ -1,6 +1,2 @@
 packages:
   dotparse.cabal
-  ../chart-svg/chart-svg.cabal
-  ../numhask/numhask.cabal
-  ../numhask-array/numhask-array.cabal
-  ../numhask-space/numhask-space.cabal
