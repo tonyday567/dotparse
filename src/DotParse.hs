@@ -4,13 +4,11 @@
 --
 -- See "DotParse.Examples" for usage.
 module DotParse
-  (
-    DotConfig(..),
+  ( DotConfig (..),
     defaultDotConfig,
     DotParse (..),
     testDotParser,
     runDotParser,
-
     Graph (..),
     defaultGraph,
     attL,
@@ -19,12 +17,11 @@ module DotParse
     processDotWith,
     processGraph,
     processGraphWith,
-
-    Strict(..),
+    Strict (..),
     defStrict,
-    Directed(..),
+    Directed (..),
     defDirected,
-    ID(..),
+    ID (..),
     label,
     Compass (..),
     Port (..),
@@ -51,7 +48,6 @@ module DotParse
     toStatements,
     toDotGraph,
     toDotGraphWith,
-
   )
 where
 

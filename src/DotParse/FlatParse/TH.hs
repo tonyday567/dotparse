@@ -9,7 +9,7 @@
 module DotParse.FlatParse.TH where
 
 import Data.ByteString hiding (head, length, reverse)
-import qualified Data.ByteString.Char8 as B
+import Data.ByteString.Char8 qualified as B
 import Data.Char hiding (isDigit)
 import Data.Functor
 import FlatParse.Basic
@@ -150,7 +150,7 @@ merge e e' = case (errorPos e, errorPos e') of
   (p, _) -> case (e, e') of
     (Precise {}, _) -> e
     (_, Precise {}) -> e'
-    (Imprecise _ es, Imprecise _ es') -> Imprecise p (es ++ es')
+    (Imprecise _ es, Imprecise _ es') -> Imprecise p (es <> es')
 {-# NOINLINE merge #-} -- merge is "cold" code, so we shouldn't inline it.
 
 -- | Pretty print an error. The `ByteString` input is the source file. The offending line from the

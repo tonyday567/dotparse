@@ -2,26 +2,27 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 
--- | Example of Dot graph construction for the NumHask class heirarchy.
+-- | Example of Dot graph construction for the <https://hackage.haskell.org/package/numhask NumHask> class heirarchy.
 module DotParse.Examples.NumHask where
 
-import qualified Algebra.Graph as G
+import Algebra.Graph qualified as G
 import Chart
 import Data.Bifunctor
-import qualified Data.Map.Strict as Map
+import Data.Map.Strict qualified as Map
 import Data.Monoid
+import Data.String.Interpolate
 import Data.Text (Text, pack)
 import DotParse
+import FlatParse.Basic
 import GHC.IO.Unsafe
 import Optics.Core
 import Prelude hiding (replicate)
-import Data.String.Interpolate
-import FlatParse.Basic
 
 -- $setup
 -- >>> import DotParse
 -- >>> :set -XOverloadedStrings
 
+-- | Names of the various classes used in numhask
 data Class
   = Magma
   | Unital
@@ -62,93 +63,89 @@ data Class
   | -- Number Types
     Integral
   | Ratio
-  -- Measure
-  | Basis
+  | -- Measure
+    Basis
   | Direction
   | Epsilon
   deriving (Show, Eq, Ord)
 
-data Family
-  = Addition
-  | Multiplication
-  | Actor
-  deriving (Show, Eq, Ord)
-
+-- | A class dependency.
 data Dependency = Dependency
   { _class :: Class,
-    _dep :: Class,
-    _op :: Maybe Family
+    _dep :: Class
   }
   deriving (Show, Eq, Ord)
 
+-- | List of all dependencies (as at v0.11)
 dependencies :: [Dependency]
 dependencies =
-  [ Dependency Unital Magma Nothing,
-    Dependency Associative Magma Nothing,
-    Dependency Commutative Magma Nothing,
-    Dependency Invertible Magma Nothing,
-    Dependency Idempotent Magma Nothing,
-    Dependency Absorbing Magma Nothing,
-    Dependency Group Unital Nothing,
-    Dependency Group Invertible Nothing,
-    Dependency Group Associative Nothing,
-    Dependency AbelianGroup Unital Nothing,
-    Dependency AbelianGroup Invertible Nothing,
-    Dependency AbelianGroup Associative Nothing,
-    Dependency AbelianGroup Commutative Nothing,
-    Dependency Additive Commutative (Just Addition),
-    Dependency Additive Unital (Just Addition),
-    Dependency Additive Associative (Just Addition),
-    Dependency Subtractive Invertible (Just Addition),
-    Dependency Subtractive Additive (Just Addition),
-    Dependency Multiplicative Unital (Just Multiplication),
-    Dependency Multiplicative Associative (Just Multiplication),
-    Dependency Multiplicative Commutative (Just Multiplication),
-    Dependency Divisive Invertible (Just Multiplication),
-    Dependency Divisive Multiplicative (Just Multiplication),
-    Dependency Distributive Additive (Just Addition),
-    Dependency Distributive Multiplicative (Just Multiplication),
-    Dependency Distributive Absorbing Nothing,
-    Dependency Ring Distributive Nothing,
-    Dependency Ring Subtractive (Just Addition),
-    Dependency IntegralDomain Ring Nothing,
-    Dependency Field Ring Nothing,
-    Dependency Field Divisive (Just Multiplication),
-    Dependency ExpField Field Nothing,
-    Dependency QuotientField Field Nothing,
-    Dependency QuotientField Ring Nothing,
-    Dependency TrigField Field Nothing,
-    Dependency UpperBoundedField Field Nothing,
-    Dependency LowerBoundedField Field Nothing,
+  [ Dependency Unital Magma,
+    Dependency Associative Magma,
+    Dependency Commutative Magma,
+    Dependency Invertible Magma,
+    Dependency Idempotent Magma,
+    Dependency Absorbing Magma,
+    Dependency Group Unital,
+    Dependency Group Invertible,
+    Dependency Group Associative,
+    Dependency AbelianGroup Unital,
+    Dependency AbelianGroup Invertible,
+    Dependency AbelianGroup Associative,
+    Dependency AbelianGroup Commutative,
+    Dependency Additive Commutative,
+    Dependency Additive Unital,
+    Dependency Additive Associative,
+    Dependency Subtractive Invertible,
+    Dependency Subtractive Additive,
+    Dependency Multiplicative Unital,
+    Dependency Multiplicative Associative,
+    Dependency Multiplicative Commutative,
+    Dependency Divisive Invertible,
+    Dependency Divisive Multiplicative,
+    Dependency Distributive Additive,
+    Dependency Distributive Multiplicative,
+    Dependency Distributive Absorbing,
+    Dependency Ring Distributive,
+    Dependency Ring Subtractive,
+    Dependency IntegralDomain Ring,
+    Dependency Field Ring,
+    Dependency Field Divisive,
+    Dependency ExpField Field,
+    Dependency QuotientField Field,
+    Dependency QuotientField Ring,
+    Dependency TrigField Field,
+    Dependency UpperBoundedField Field,
+    Dependency LowerBoundedField Field,
     -- higher-kinded relationships
-    Dependency AdditiveAction Additive (Just Actor),
-    Dependency SubtractiveAction Subtractive (Just Actor),
-    Dependency MultiplicativeAction Multiplicative (Just Actor),
-    Dependency DivisiveAction Divisive (Just Actor),
-    Dependency Actions Distributive (Just Actor),
+    Dependency AdditiveAction Additive,
+    Dependency SubtractiveAction Subtractive,
+    Dependency MultiplicativeAction Multiplicative,
+    Dependency DivisiveAction Divisive,
+    Dependency Actions Distributive,
     -- Lattice
-    Dependency JoinSemiLattice Associative Nothing,
-    Dependency JoinSemiLattice Commutative Nothing,
-    Dependency JoinSemiLattice Idempotent Nothing,
-    Dependency MeetSemiLattice Associative Nothing,
-    Dependency MeetSemiLattice Commutative Nothing,
-    Dependency MeetSemiLattice Idempotent Nothing,
-    Dependency Lattice JoinSemiLattice Nothing,
-    Dependency Lattice MeetSemiLattice Nothing,
-    Dependency BoundedJoinSemiLattice JoinSemiLattice Nothing,
-    Dependency BoundedJoinSemiLattice Unital Nothing,
-    Dependency BoundedMeetSemiLattice MeetSemiLattice Nothing,
-    Dependency BoundedMeetSemiLattice Unital Nothing,
-    Dependency BoundedLattice BoundedJoinSemiLattice Nothing,
-    Dependency BoundedLattice BoundedMeetSemiLattice Nothing,
-    Dependency Basis Distributive Nothing,
-    Dependency Direction Distributive Nothing,
-    Dependency Epsilon Subtractive Nothing,
-    Dependency Epsilon MeetSemiLattice Nothing,
-    Dependency Integral Ring Nothing,
-    Dependency Ratio Field Nothing
+    Dependency JoinSemiLattice Associative,
+    Dependency JoinSemiLattice Commutative,
+    Dependency JoinSemiLattice Idempotent,
+    Dependency MeetSemiLattice Associative,
+    Dependency MeetSemiLattice Commutative,
+    Dependency MeetSemiLattice Idempotent,
+    Dependency Lattice JoinSemiLattice,
+    Dependency Lattice MeetSemiLattice,
+    Dependency BoundedJoinSemiLattice JoinSemiLattice,
+    Dependency BoundedJoinSemiLattice Unital,
+    Dependency BoundedMeetSemiLattice MeetSemiLattice,
+    Dependency BoundedMeetSemiLattice Unital,
+    Dependency BoundedLattice BoundedJoinSemiLattice,
+    Dependency BoundedLattice BoundedMeetSemiLattice,
+    Dependency Basis Distributive,
+    Dependency Direction Distributive,
+    Dependency Epsilon Subtractive,
+    Dependency Epsilon MeetSemiLattice,
+    Dependency Integral Ring,
+    Dependency Ratio Field
   ]
 
+-- | List of classes to use in diagram.
 classesNH :: [Class]
 classesNH =
   [ Additive,
@@ -168,6 +165,7 @@ classesNH =
     Ratio
   ]
 
+-- | Names of the modules where each class is located.
 classesModule :: [(Class, Text)]
 classesModule =
   [ (Additive, "NumHask-Algebra-Additive"),
@@ -189,13 +187,14 @@ classesModule =
     (Ratio, "NumHask-Data-Rational")
   ]
 
+-- | List of dependencies to draw.
 dependenciesNH :: [Dependency] -> [Dependency]
-dependenciesNH = filter (\(Dependency x0 x1 _) -> x0 `elem` classesNH && x1 `elem` classesNH)
+dependenciesNH = filter (\(Dependency x0 x1) -> x0 `elem` classesNH && x1 `elem` classesNH)
 
 -- | NumHask Classes as an algebraic graph
 graphNHG :: G.Graph Class
 graphNHG =
-  G.edges ((\(Dependency x y _) -> (x, y)) <$> dependenciesNH dependencies)
+  G.edges ((\(Dependency x y) -> (x, y)) <$> dependenciesNH dependencies)
     <> G.vertices classesNH
 
 -- | NumHask statements in a dot Graph with box shapes for the nodes.
@@ -215,7 +214,7 @@ dotGraphNH' d = unsafePerformIO $ processGraph (dotGraphNH d)
 -- | Convert a node ID to a label for chart-svg charts
 -- Doing this directly in dot doesn't quite work because the engines get the width of the link wrong.
 toLink :: ID -> Text
-toLink id_ =[i|<a href="https://hackage.haskell.org/package/numhask/docs/#{m}.html\#t:#{t}">#{t}</a>|]
+toLink id_ = [i|<a href="https://hackage.haskell.org/package/numhask/docs/#{m}.html\#t:#{t}">#{t}</a>|]
   where
     t = pack (label id_)
     m = Map.fromList (first (pack . show) <$> classesModule) Map.! t
@@ -227,4 +226,3 @@ toLink id_ =[i|<a href="https://hackage.haskell.org/package/numhask/docs/#{m}.ht
 -- ![NumHask Example](other/nh.svg)
 writeNHChart :: IO ()
 writeNHChart = writeChartOptions "other/nh.svg" (graphToChartWith (defaultChartConfig & #labelf .~ toLink & #chartColor .~ over lightness' (* 0.5) (palette1 2) & #chartBackgroundColor .~ set opac' 0.1 (palette1 1)) (dotGraphNH' Directed))
-  -- writeChartOptions "other/nh.svg" (graphToChartWith (defaultChartConfig & #labelf .~ toLink) (dotGraphNH' Directed))

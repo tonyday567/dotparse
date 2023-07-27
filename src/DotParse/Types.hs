@@ -1,4 +1,3 @@
-{-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -49,6 +48,7 @@ module DotParse.Types
     addStatement,
     addStatements,
     SubGraphStatement (..),
+    GlobalAttributeStatement (..),
 
     -- * Graph Extraction
     bbL,
@@ -78,20 +78,21 @@ module DotParse.Types
   )
 where
 
-import qualified Algebra.Graph as G
+import Algebra.Graph qualified as G
 import Chart
 import Control.Monad
 import Data.Bool
 import Data.ByteString hiding (any, empty, filter, head, length, map, zip, zipWith)
-import qualified Data.ByteString.Char8 as B
+import Data.ByteString.Char8 qualified as B
 import Data.List.NonEmpty hiding (filter, head, length, map, zip, zipWith, (!!))
 import Data.Map.Merge.Strict
-import qualified Data.Map.Strict as Map
+import Data.Map.Strict qualified as Map
 import Data.Maybe
 import Data.Monoid
 import Data.Proxy
+import Data.String.Interpolate
 import Data.Text (Text)
-import qualified Data.Text as Text
+import Data.Text qualified as Text
 import Data.These
 import DotParse.FlatParse
 import FlatParse.Basic hiding (cut)
@@ -100,7 +101,6 @@ import Optics.Core
 import System.Exit
 import System.Process.ByteString
 import Prelude hiding (replicate)
-import Data.String.Interpolate
 
 -- $setup
 -- >>> import DotParse
@@ -429,10 +429,12 @@ data AttributeStatement = AttributeStatement {attributeType :: AttributeType, at
 instance DotParse AttributeStatement where
   dotPrint cfg (AttributeStatement t as) =
     bool
-    (intercalate
-      " "
-      [dotPrint cfg t, dotPrint cfg as])
-    mempty (mempty == as)
+      ( intercalate
+          " "
+          [dotPrint cfg t, dotPrint cfg as]
+      )
+      mempty
+      (mempty == as)
 
   dotParse = AttributeStatement <$> dotParse <*> dotParse
 
@@ -567,7 +569,7 @@ addStatements ss g = Prelude.foldr addStatement g ss
 -- | default dot graph as a ByteString
 defaultBS :: ByteString
 defaultBS =
-    [i|
+  [i|
 digraph {
     node [shape=circle
          ,height=0.5];
@@ -826,7 +828,6 @@ defaultChartConfig :: ChartConfig
 defaultChartConfig = ChartConfig 500 72 0.5 (over lightness' (* 0.5) (palette1 0)) (set opac' 0.2 (palette1 0)) 0.5 0.5 (-3.7) 14 (Text.pack . label)
 
 -- | convert a 'Graph' processed via the graphviz commands to a 'ChartOptions'
---
 graphToChartWith :: ChartConfig -> Graph -> ChartOptions
 graphToChartWith cfg g =
   mempty

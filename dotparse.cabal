@@ -26,6 +26,8 @@ homepage:        https://github.com/tonyday567/dotparse#readme
 bug-reports:     https://github.com/tonyday567/dotparse/issues
 build-type:      Simple
 extra-doc-files: other/*.svg
+                 ChangeLog.md
+                 readme.org
 
 source-repository head
   type:     git

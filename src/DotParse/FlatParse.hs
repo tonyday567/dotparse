@@ -42,7 +42,7 @@ where
 
 import Data.Bool
 import Data.ByteString hiding (empty, head, length, map, zip, zipWith)
-import qualified Data.ByteString.Char8 as B
+import Data.ByteString.Char8 qualified as B
 import Data.Char hiding (isDigit)
 import Data.List.NonEmpty
 import DotParse.FlatParse.TH hiding (merge)
