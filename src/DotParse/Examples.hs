@@ -1,30 +1,21 @@
-{-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE BlockArguments #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE TypeApplications #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
-{-# OPTIONS_GHC -Wno-unused-local-binds #-}
 
 -- | Examples of conversion from dot ByteStrings
 --
 -- Most examples from https://renenyffenegger.ch/notes/tools/Graphviz/examples/index
 module DotParse.Examples where
 
-import qualified Algebra.Graph as G
-import Control.Monad ( zipWithM_ )
-import Data.ByteString ( ByteString )
-import Data.Proxy ( Proxy(..) )
+import Algebra.Graph qualified as G
+import Control.Monad (zipWithM_)
+import Data.ByteString (ByteString)
+import Data.Proxy (Proxy (..))
+import Data.String.Interpolate
 import DotParse
 import Prelude hiding (replicate)
-import Data.String.Interpolate
 
 -- $setup
 -- >>> import DotParse
@@ -45,8 +36,7 @@ import Data.String.Interpolate
 -- >>> testDotParser (Proxy :: Proxy Graph) defaultDotConfig ex0
 ex0 :: ByteString
 ex0 =
-
-    [i|
+  [i|
 graph {}
 |]
 
@@ -54,8 +44,7 @@ graph {}
 -- ![Example](other/ex1.svg)
 ex1 :: ByteString
 ex1 =
-
-    [i|
+  [i|
 digraph D {
     A [shape=diamond]
     B [shape=box]
@@ -70,8 +59,7 @@ digraph D {
 -- ![Example](other/ex2.svg)
 ex2 :: ByteString
 ex2 =
-
-    [i|
+  [i|
 digraph D {
 
     node [fontname="Arial"];
@@ -86,8 +74,7 @@ digraph D {
 -- ![Example](other/ex3.svg)
 ex3 :: ByteString
 ex3 =
-
-    [i|
+  [i|
 digraph D {
   A -> {B, C, D} -> {F}
 }
@@ -98,8 +85,7 @@ digraph D {
 -- ![Example](other/ex4.svg)
 ex4 :: ByteString
 ex4 =
-
-    [i|
+  [i|
 digraph L {
 
   node [shape=record fontname=Arial];
@@ -118,8 +104,7 @@ digraph L {
 -- ![Example](other/ex5.svg)
 ex5 :: ByteString
 ex5 =
-
-    [i|
+  [i|
 digraph D {
 
   label = "The foo, the bar and the baz";
@@ -138,8 +123,7 @@ digraph D {
 -- ![Example](other/ex6.svg)
 ex6 :: ByteString
 ex6 =
-
-    [i|
+  [i|
 digraph D {
 
   label = <The <font color='red'><b>foo</b></font>,<br/> the <font point-size='20'>bar</font> and<br/> the <i>baz</i>>;
@@ -157,8 +141,7 @@ digraph D {
 -- ![Example](other/ex7.svg)
 ex7 :: ByteString
 ex7 =
-
-    [i|
+  [i|
 digraph R {
 
   { rank=same rA sA tA }
@@ -180,8 +163,7 @@ digraph R {
 -- ![Example](other/ex8.svg)
 ex8 :: ByteString
 ex8 =
-
-    [i|
+  [i|
 digraph Q {
 
   nd_1   [label = "Node 1"];
@@ -212,8 +194,7 @@ digraph Q {
 -- ![Example](other/ex9.svg)
 ex9 :: ByteString
 ex9 =
-
-    [i|
+  [i|
 digraph D {
 
   subgraph cluster_p {
@@ -248,8 +229,7 @@ digraph D {
 -- ![Example](other/ex10.svg)
 ex10 :: ByteString
 ex10 =
-
-    [i|
+  [i|
 digraph H {
 
   aHtmlTable [
@@ -271,8 +251,7 @@ digraph H {
 -- ![Example](other/ex11.svg)
 ex11 :: ByteString
 ex11 =
-
-    [i|
+  [i|
 digraph {
 
   tbl [
@@ -311,7 +290,7 @@ digraph {
 -- ![Example](other/ex12.svg)
 ex12 :: ByteString
 ex12 =
-    [i|
+  [i|
 digraph D {
 
   node [shape=plaintext]
@@ -332,8 +311,7 @@ digraph D {
 -- ![Example](other/ex13.svg)
 ex13 :: ByteString
 ex13 =
-
-    [i|
+  [i|
 digraph H {
 
   aHtmlTable [
@@ -355,8 +333,7 @@ digraph H {
 -- ![Example](other/ex14.svg)
 ex14 :: ByteString
 ex14 =
-
-    [i|
+  [i|
 digraph H {
 
   parent [
@@ -404,8 +381,7 @@ digraph H {
 -- ![Example](other/ex15.svg)
 ex15 :: ByteString
 ex15 =
-
-    [i|
+  [i|
 digraph D {
 
   node [shape=plaintext fontname="Sans serif" fontsize="8"];
@@ -543,10 +519,9 @@ svgAll =
 -- >>> writeChartOptions "other/exga.svg" (graphToChartWith defaultChartConfig exGraphAugmented)
 --
 -- ![augmentation example](other/exga.svg)
---
 exAGraph :: G.Graph Int
 exAGraph =
   G.edges $
     [(v, (v + 1) `mod` 6) | v <- [0 .. 5]]
-      ++ [(v, v + k) | v <- [0 .. 5], k <- [6, 12]]
-      ++ [(2, 18), (2, 19), (15, 18), (15, 19), (18, 3), (19, 3)]
+      <> [(v, v + k) | v <- [0 .. 5], k <- [6, 12]]
+      <> [(2, 18), (2, 19), (15, 18), (15, 19), (18, 3), (19, 3)]

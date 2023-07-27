@@ -18,14 +18,18 @@ Parsing and printing for the dot language of graphviz.
 
 Graphviz documentation:
 
-[[https://www.graphviz.org/][Graphviz]]
+[[https://www.graphviz.org/][Graphviz Main Page]]
+
 [[http://magjac.com/graphviz-visual-editor/][Graphviz Visual Editor]]
+
 [[http://www.graphviz.org/doc/info/attrs.html][Attributes | Graphviz]]
-[[http://www.graphviz.org/pdf/dot.1.pdf]]
+
+[[http://www.graphviz.org/pdf/dot.1.pdf][Dot Grammar]]
 
 Graphviz practical examples:
 
 https://renenyffenegger.ch/notes/tools/Graphviz/examples/index
+
 https://renenyffenegger.ch/notes/tools/Graphviz/attributes/label/HTML-like/index
 
 ** Similar projects
@@ -70,7 +74,7 @@ exAGraph =
 #+RESULTS:
 : ghci| ghci| ghci| ghci| ghci| ghci| ghci|
 
-#+begin_src haskell
+#+begin_src haskell :results output :exports both
 exAGraph
 #+end_src
 
@@ -89,7 +93,7 @@ exGraph = defaultGraph & addStatements (toStatements Directed (Char8.pack . show
 
 Encode graph as a ByteString (prior to processing via graphviz)
 
-#+begin_src haskell :results output
+#+begin_src haskell :results output :exports both
 BS.putStr (dotPrint defaultDotConfig exGraph)
 #+end_src
 

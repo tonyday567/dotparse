@@ -1,0 +1,26 @@
+- ignore: {name: Eta reduce}
+- ignore: {name: Use if}
+- ignore: {name: Use foldMap}
+- ignore: {name: Use null}
+- ignore: {name: Use head}
+- ignore: {name: Use <$>}
+- ignore: {name: Use first}
+- ignore: {name: 'Use ?~'}
+- ignore: {name: 'Move brackets to avoid $'}
+- ignore: {name: Avoid lambda}
+- ignore: {name: Avoid lambda using `infix`}
+- ignore: {name: Reduce duplication, within: Chart.Examples}
+- ignore: {name: Reduce duplication, within: Chart.Bar}
+- ignore: {name: Use isAsciiLower}
+- ignore: {name: Use isAsciiUpper}
+- ignore: {name: Use isDigit}
+- ignore: {name: Use unwords}
+# Replace a $ b $ c with a . b $ c
+#- group: {name: dollar, enabled: true}
+
+# Generalise map to fmap, ++ to <>
+- group: {name: generalise, enabled: true}
+- ignore: {name: Use head, within: [Chart.Types, Chart.Examples]}
+
+# To generate a suitable file for HLint do:
+# $ hlint --default > .hlint.yaml

@@ -1,20 +1,14 @@
-{-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE BlockArguments #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_HADDOCK prune #-}
 
 -- | Parser & Printer for the dot language of <http://www.graphviz.org/doc/info/lang.html graphviz>
 --
 -- See "DotParse.Examples" for usage.
 module DotParse
-  (
-    DotConfig(..),
+  ( DotConfig (..),
     defaultDotConfig,
     DotParse (..),
     testDotParser,
     runDotParser,
-
     Graph (..),
     defaultGraph,
     attL,
@@ -23,12 +17,11 @@ module DotParse
     processDotWith,
     processGraph,
     processGraphWith,
-
-    Strict(..),
+    Strict (..),
     defStrict,
-    Directed(..),
+    Directed (..),
     defDirected,
-    ID(..),
+    ID (..),
     label,
     Compass (..),
     Port (..),
@@ -55,7 +48,6 @@ module DotParse
     toStatements,
     toDotGraph,
     toDotGraphWith,
-
   )
 where
 
