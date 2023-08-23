@@ -72,7 +72,6 @@ runParser_ p b = case runParser p b of
   Err e -> error $ utf8ToStr $ prettyError b e
 
 -- * parsing
-
 digit :: Parser Error Int
 digit = (\c -> ord c - ord '0') <$> satisfyAscii isDigit
 
