@@ -20,6 +20,7 @@ module DotParse.Types
     gattL,
     attL,
     defaultGraph,
+    balancedGraph,
     processDotWith,
     processDot,
     processGraph,
@@ -592,6 +593,9 @@ digraph {
 defaultGraph :: Graph
 defaultGraph = runDotParser defaultBS
 
+balancedGraph :: Graph
+balancedGraph = defaultGraph & attL GraphType (ID "center") .~ Just (ID "true")
+
 -- | run a dot string through graphviz, supplying arguments and collecting stdout
 processDotWith :: Directed -> [String] -> ByteString -> IO ByteString
 processDotWith d args i = do
@@ -809,6 +813,8 @@ toStatements d g =
        )
 
 -- | Various configutaion parameters for the chart-svg Chart
+-- FIXME:
+-- chartScale, nodeHeight, nodeSize seem to have no effect
 data ChartConfig = ChartConfig
   { chartHeight :: Double,
     chartScale :: Double,
@@ -819,27 +825,29 @@ data ChartConfig = ChartConfig
     nodeSize :: Double,
     vshift :: Double,
     textSize :: Double,
-    labelf :: ID -> Text
+    labelf :: ID -> Text,
+    escapeText :: EscapeText
   }
   deriving (Generic)
 
 -- | default parameters
 defaultChartConfig :: ChartConfig
-defaultChartConfig = ChartConfig 500 72 0.5 (over lightness' (* 0.5) (palette1 0)) (set opac' 0.2 (palette1 0)) 0.5 0.5 (-3.7) 14 (Text.pack . label)
+defaultChartConfig = ChartConfig 500 72 0.5 (over lightness' (* 0.5) (palette1 0)) (set opac' 0.2 (palette1 0)) 0.5 0.5 (-3.7) 14 (Text.pack . label) NoEscapeText
 
 -- | convert a 'Graph' processed via the graphviz commands to a 'ChartOptions'
 graphToChartWith :: ChartConfig -> Graph -> ChartOptions
 graphToChartWith cfg g =
   mempty
     & #charts .~ named "edges" ps <> named "shapes" c0 <> named "labels" [ts]
-    & #markupOptions % #markupHeight .~ (cfg ^. #chartHeight)
-    & #hudOptions .~ (mempty & #chartAspect .~ ChartAspect)
+    & #markupOptions % #markupHeight .~ (Just $ cfg ^. #chartHeight)
+    & #markupOptions % #chartAspect .~ ChartAspect
+    & #hudOptions .~ mempty
   where
     glyphs w = case view (attL NodeType (ID "shape")) g of
       Just (ID "circle") -> defaultGlyphStyle & #shape .~ CircleGlyph & #size .~ (cfg ^. #chartScale) * w & #borderSize .~ (cfg ^. #edgeSize) & #borderColor .~ (cfg ^. #chartColor) & #color .~ (cfg ^. #chartBackgroundColor)
-      Just (ID "box") -> defaultGlyphStyle & #shape .~ RectSharpGlyph (h / w) & #size .~ 72 * w & #borderSize .~ 1 & #borderColor .~ (cfg ^. #chartColor) & #color .~ (cfg ^. #chartBackgroundColor)
+      Just (ID "box") -> defaultGlyphStyle & #shape .~ RectSharpGlyph (h / w) & #size .~ (cfg ^. #chartScale) * w & #borderSize .~ 1 & #borderColor .~ (cfg ^. #chartColor) & #color .~ (cfg ^. #chartBackgroundColor)
       -- defaults to circle
-      _ -> defaultGlyphStyle & #shape .~ CircleGlyph & #size .~ 72 * w & #borderSize .~ 1 & #borderColor .~ (cfg ^. #chartColor) & #color .~ (cfg ^. #chartBackgroundColor)
+      _ -> defaultGlyphStyle & #shape .~ CircleGlyph & #size .~ (cfg ^. #chartScale) * w & #borderSize .~ 1 & #borderColor .~ (cfg ^. #chartColor) & #color .~ (cfg ^. #chartBackgroundColor)
     h = maybe (cfg ^. #nodeHeight) (runParser_ double . strToUtf8 . label) (view (attL NodeType (ID "height")) g)
     vshift' = cfg ^. #vshift
     -- node information
@@ -852,7 +860,7 @@ graphToChartWith cfg g =
     c0 = fmap (\(NodeInfo _ w p) -> GlyphChart (glyphs w) [p]) ns
     -- labels
     ts =
-      TextChart (defaultTextStyle & #size .~ (cfg ^. #textSize) & #color .~ (cfg ^. #chartColor)) ((\(NodeInfo l _ (Point x y)) -> ((cfg ^. #labelf) l, Point x (vshift' + y))) <$> ns)
+      TextChart (defaultTextStyle & #escapeText .~ (cfg ^. #escapeText) & #size .~ (cfg ^. #textSize) & #color .~ (cfg ^. #chartColor)) ((\(NodeInfo l _ (Point x y)) -> ((cfg ^. #labelf) l, Point x (vshift' + y))) <$> ns)
 
 -- | convert a 'Graph' processed via the graphviz commands to a 'ChartOptions' using the default ChartConfig.
 graphToChart :: Graph -> ChartOptions

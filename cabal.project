@@ -1,2 +1,4 @@
 packages:
   dotparse.cabal
+  ../chart-svg/chart-svg.cabal
+  ../prettychart/prettychart.cabal
