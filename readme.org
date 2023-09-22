@@ -354,8 +354,7 @@ digraph {
     }
 #+end_quote
 
-
-** Next reproduction of svg that dot creates
+** reproduction of svg that dot creates
 
 base graph
 
@@ -458,7 +457,6 @@ BS.putStr bs
 #+begin_example
 digraph {
 	graph [bb="0,0,525,324",
-		center=true,
 		overlap=false,
 		rankdir=TB,
 		size="5!",
@@ -473,53 +471,70 @@ digraph {
 		width=0.90278];
 	RealFloat	[pos="72,18",
 		width=0.95833];
-	RealFrac -> RealFloat	[pos="e,82.018,36.104 102.87,71.697 97.553,62.626 90.98,51.404 85.267,41.65"];
+	RealFrac -
+RealFloat	[pos="e,82.018,36.104 102.87,71.697 97.553,62.626 90.98,51.404 85.267,41.65"];
 	Real	[pos="117,162",
 		width=0.75];
-	Real -> RealFrac	[pos="e,113.98,108.1 116.01,143.7 115.51,134.88 114.89,124.03 114.34,114.47"];
+	Real -
+RealFrac	[pos="e,113.98,108.1 116.01,143.7 115.51,134.88 114.89,124.03 114.34,114.47"];
 	Integral	[pos="193,90",
 		width=0.81944];
-	Real -> Integral	[pos="e,174.17,108.35 135.79,143.7 146.02,134.27 158.77,122.53 169.64,112.52"];
+	Real -
+Integral	[pos="e,174.17,108.35 135.79,143.7 146.02,134.27 158.77,122.53 169.64,112.52"];
 	Ord2	[pos="268,90",
 		width=0.75];
 	Ord1	[pos="266,162",
 		width=0.75];
-	Ord1 -> Ord2	[pos="e,267.51,108.1 266.49,143.7 266.75,134.88 267.06,124.03 267.33,114.47"];
+	Ord1 -
+Ord2	[pos="e,267.51,108.1 266.49,143.7 266.75,134.88 267.06,124.03 267.33,114.47"];
 	Ord	[pos="302,234",
 		width=0.75];
-	Ord -> Real	[pos="e,144.47,174.89 274.58,223.45 245.31,213.15 197.63,196.05 157,180 154.84,179.15 152.62,178.25 150.38,177.34"];
-	Ord -> Ord1	[pos="e,274.8,180.1 293.1,215.7 288.44,206.63 282.67,195.4 277.65,185.65"];
+	Ord -
+Real	[pos="e,144.47,174.89 274.58,223.45 245.31,213.15 197.63,196.05 157,180 154.84,179.15 152.62,178.25 150.38,177.34"];
+	Ord -
+Ord1	[pos="e,274.8,180.1 293.1,215.7 288.44,206.63 282.67,195.4 277.65,185.65"];
 	Ix	[pos="338,162",
 		width=0.75];
-	Ord -> Ix	[pos="e,329.2,180.1 310.9,215.7 315.56,206.63 321.33,195.4 326.35,185.65"];
+	Ord -
+Ix	[pos="e,329.2,180.1 310.9,215.7 315.56,206.63 321.33,195.4 326.35,185.65"];
 	Num	[pos="77,234",
 		width=0.75];
-	Num -> Real	[pos="e,107.23,180.1 86.888,215.7 92.071,206.63 98.483,195.4 104.06,185.65"];
+	Num -
+Real	[pos="e,107.23,180.1 86.888,215.7 92.071,206.63 98.483,195.4 104.06,185.65"];
 	Fractional	[pos="36,162",
 		width=0.98611];
-	Num -> Fractional	[pos="e,46.018,180.1 66.865,215.7 61.553,206.63 54.98,195.4 49.267,185.65"];
+	Num -
+Fractional	[pos="e,46.018,180.1 66.865,215.7 61.553,206.63 54.98,195.4 49.267,185.65"];
 	Floating	[pos="31,90",
 		width=0.86111];
-	Fractional -> Floating	[pos="e,32.222,108.1 34.764,143.7 34.134,134.88 33.359,124.03 32.677,114.47"];
-	Floating -> RealFloat	[pos="e,61.982,36.104 41.135,71.697 46.447,62.626 53.02,51.404 58.733,41.65"];
+	Fractional -
+Floating	[pos="e,32.222,108.1 34.764,143.7 34.134,134.88 33.359,124.03 32.677,114.47"];
+	Floating -
+RealFloat	[pos="e,61.982,36.104 41.135,71.697 46.447,62.626 53.02,51.404 58.733,41.65"];
 	FiniteBits	[pos="490,162",
 		width=0.97222];
 	Eq2	[pos="410,162",
 		width=0.75];
 	Eq1	[pos="410,234",
 		width=0.75];
-	Eq1 -> Eq2	[pos="e,410,180.1 410,215.7 410,206.88 410,196.03 410,186.47"];
+	Eq1 -
+Eq2	[pos="e,410,180.1 410,215.7 410,206.88 410,196.03 410,186.47"];
 	Eq	[pos="410,306",
 		width=0.75];
-	Eq -> Ord	[pos="e,328.63,252.26 383.03,287.52 368.09,277.84 349.45,265.75 333.81,255.62"];
-	Eq -> Eq1	[pos="e,410,252.1 410,287.7 410,278.88 410,268.03 410,258.47"];
+	Eq -
+Ord	[pos="e,328.63,252.26 383.03,287.52 368.09,277.84 349.45,265.75 333.81,255.62"];
+	Eq -
+Eq1	[pos="e,410,252.1 410,287.7 410,278.88 410,268.03 410,258.47"];
 	Bits	[pos="486,234",
 		width=0.75];
-	Eq -> Bits	[pos="e,467.17,252.35 428.79,287.7 439.02,278.27 451.77,266.53 462.64,256.52"];
+	Eq -
+Bits	[pos="e,467.17,252.35 428.79,287.7 439.02,278.27 451.77,266.53 462.64,256.52"];
 	Enum	[pos="193,162",
 		width=0.75];
-	Enum -> Integral	[pos="e,193,108.1 193,143.7 193,134.88 193,124.03 193,114.47"];
-	Bits -> FiniteBits	[pos="e,489.02,180.1 486.99,215.7 487.49,206.88 488.11,196.03 488.66,186.47"];
+	Enum -
+Integral	[pos="e,193,108.1 193,143.7 193,134.88 193,124.03 193,114.47"];
+	Bits -
+FiniteBits	[pos="e,489.02,180.1 486.99,215.7 487.49,206.88 488.11,196.03 488.66,186.47"];
 }
 #+end_example
 
@@ -532,7 +547,7 @@ BS.putStr =<< (dotPrint defaultDotConfig <$> processGraph baseGraph)
 #+begin_example
 digraph {
     node [height=0.5;label="\N";shape=box]
-    graph [bb="0,0,525,324";center=true;overlap=false;rankdir=TB;size="5!";splines=spline]
+    graph [bb="0,0,525,324";overlap=false;rankdir=TB;size="5!";splines=spline]
     edge [arrowsize=0.5]
     Enum [pos="193,162";width=0.75]
     Bits [pos="486,234";width=0.75]
@@ -551,23 +566,40 @@ digraph {
     Real [pos="117,162";width=0.75]
     RealFloat [pos="72,18";width=0.95833]
     RealFrac [pos="113,90";width=0.90278]
-    Bits -> FiniteBits [pos="e,489.02,180.1 486.99,215.7 487.49,206.88 488.11,196.03 488.66,186.47"]
-    Enum -> Integral [pos="e,193,108.1 193,143.7 193,134.88 193,124.03 193,114.47"]
-    Eq -> Bits [pos="e,467.17,252.35 428.79,287.7 439.02,278.27 451.77,266.53 462.64,256.52"]
-    Eq -> Eq1 [pos="e,410,252.1 410,287.7 410,278.88 410,268.03 410,258.47"]
-    Eq -> Ord [pos="e,328.63,252.26 383.03,287.52 368.09,277.84 349.45,265.75 333.81,255.62"]
-    Eq1 -> Eq2 [pos="e,410,180.1 410,215.7 410,206.88 410,196.03 410,186.47"]
-    Floating -> RealFloat [pos="e,61.982,36.104 41.135,71.697 46.447,62.626 53.02,51.404 58.733,41.65"]
-    Fractional -> Floating [pos="e,32.222,108.1 34.764,143.7 34.134,134.88 33.359,124.03 32.677,114.47"]
-    Num -> Fractional [pos="e,46.018,180.1 66.865,215.7 61.553,206.63 54.98,195.4 49.267,185.65"]
-    Num -> Real [pos="e,107.23,180.1 86.888,215.7 92.071,206.63 98.483,195.4 104.06,185.65"]
-    Ord -> Ix [pos="e,329.2,180.1 310.9,215.7 315.56,206.63 321.33,195.4 326.35,185.65"]
-    Ord -> Ord1 [pos="e,274.8,180.1 293.1,215.7 288.44,206.63 282.67,195.4 277.65,185.65"]
-    Ord -> Real [pos="e,144.47,174.89 274.58,223.45 245.31,213.15 197.63,196.05 157,180 154.84,179.15 152.62,178.25 150.38,177.34"]
-    Ord1 -> Ord2 [pos="e,267.51,108.1 266.49,143.7 266.75,134.88 267.06,124.03 267.33,114.47"]
-    Real -> Integral [pos="e,174.17,108.35 135.79,143.7 146.02,134.27 158.77,122.53 169.64,112.52"]
-    Real -> RealFrac [pos="e,113.98,108.1 116.01,143.7 115.51,134.88 114.89,124.03 114.34,114.47"]
-    RealFrac -> RealFloat [pos="e,82.018,36.104 102.87,71.697 97.553,62.626 90.98,51.404 85.267,41.65"]
+    Bits -
+FiniteBits [pos="e,489.02,180.1 486.99,215.7 487.49,206.88 488.11,196.03 488.66,186.47"]
+    Enum -
+Integral [pos="e,193,108.1 193,143.7 193,134.88 193,124.03 193,114.47"]
+    Eq -
+Bits [pos="e,467.17,252.35 428.79,287.7 439.02,278.27 451.77,266.53 462.64,256.52"]
+    Eq -
+Eq1 [pos="e,410,252.1 410,287.7 410,278.88 410,268.03 410,258.47"]
+    Eq -
+Ord [pos="e,328.63,252.26 383.03,287.52 368.09,277.84 349.45,265.75 333.81,255.62"]
+    Eq1 -
+Eq2 [pos="e,410,180.1 410,215.7 410,206.88 410,196.03 410,186.47"]
+    Floating -
+RealFloat [pos="e,61.982,36.104 41.135,71.697 46.447,62.626 53.02,51.404 58.733,41.65"]
+    Fractional -
+Floating [pos="e,32.222,108.1 34.764,143.7 34.134,134.88 33.359,124.03 32.677,114.47"]
+    Num -
+Fractional [pos="e,46.018,180.1 66.865,215.7 61.553,206.63 54.98,195.4 49.267,185.65"]
+    Num -
+Real [pos="e,107.23,180.1 86.888,215.7 92.071,206.63 98.483,195.4 104.06,185.65"]
+    Ord -
+Ix [pos="e,329.2,180.1 310.9,215.7 315.56,206.63 321.33,195.4 326.35,185.65"]
+    Ord -
+Ord1 [pos="e,274.8,180.1 293.1,215.7 288.44,206.63 282.67,195.4 277.65,185.65"]
+    Ord -
+Real [pos="e,144.47,174.89 274.58,223.45 245.31,213.15 197.63,196.05 157,180 154.84,179.15 152.62,178.25 150.38,177.34"]
+    Ord1 -
+Ord2 [pos="e,267.51,108.1 266.49,143.7 266.75,134.88 267.06,124.03 267.33,114.47"]
+    Real -
+Integral [pos="e,174.17,108.35 135.79,143.7 146.02,134.27 158.77,122.53 169.64,112.52"]
+    Real -
+RealFrac [pos="e,113.98,108.1 116.01,143.7 115.51,134.88 114.89,124.03 114.34,114.47"]
+    RealFrac -
+RealFloat [pos="e,82.018,36.104 102.87,71.697 97.553,62.626 90.98,51.404 85.267,41.65"]
     }
 #+end_example
 
@@ -589,6 +621,12 @@ csLabels
 #+RESULTS:
 : [TextChart (TextStyle {size = 14.0, color = Colour -0.51 0.30 0.37 1.00, anchor = AnchorMiddle, hsize = 0.45, vsize = 1.1, vshift = -0.25, rotation = Nothing, scalex = ScaleX, escapeText = NoEscapeText, frame = Nothing}) [("Bits",Point 486.0 230.3),("Enum",Point 193.0 158.3),("Eq",Point 410.0 302.3),("Eq1",Point 410.0 230.3),("Eq2",Point 410.0 158.3),("FiniteBits",Point 490.0 158.3),("Floating",Point 31.0 86.3),("Fractional",Point 36.0 158.3),("Integral",Point 193.0 86.3),("Ix",Point 338.0 158.3),("Num",Point 77.0 230.3),("Ord",Point 302.0 230.3),("Ord1",Point 266.0 158.3),("Ord2",Point 268.0 86.3),("Real",Point 117.0 158.3),("RealFloat",Point 72.0 14.3),("RealFrac",Point 113.0 86.3)]]
 
+#+begin_src haskell :results output
+csShapes
+#+end_src
+
+#+RESULTS:
+: [GlyphChart (GlyphStyle {size = 54.0, color = Colour 0.02 0.73 0.80 0.20, borderColor = Colour -0.51 0.30 0.37 1.00, borderSize = 1.0, shape = RectSharpGlyph 0.6666666666666666, rotation = Nothing, translate = Nothing}) [Point 486.0 234.0],GlyphChart (GlyphStyle {size = 54.0, color = Colour 0.02 0.73 0.80 0.20, borderColor = Colour -0.51 0.30 0.37 1.00, borderSize = 1.0, shape = RectSharpGlyph 0.6666666666666666, rotation = Nothing, translate = Nothing}) [Point 193.0 162.0],GlyphChart (GlyphStyle {size = 54.0, color = Colour 0.02 0.73 0.80 0.20, borderColor = Colour -0.51 0.30 0.37 1.00, borderSize = 1.0, shape = RectSharpGlyph 0.6666666666666666, rotation = Nothing, translate = Nothing}) [Point 410.0 306.0],GlyphChart (GlyphStyle {size = 54.0, color = Colour 0.02 0.73 0.80 0.20, borderColor = Colour -0.51 0.30 0.37 1.00, borderSize = 1.0, shape = RectSharpGlyph 0.6666666666666666, rotation = Nothing, translate = Nothing}) [Point 410.0 234.0],GlyphChart (GlyphStyle {size = 54.0, color = Colour 0.02 0.73 0.80 0.20, borderColor = Colour -0.51 0.30 0.37 1.00, borderSize = 1.0, shape = RectSharpGlyph 0.6666666666666666, rotation = Nothing, translate = Nothing}) [Point 410.0 162.0],GlyphChart (GlyphStyle {size = 69.99983999999999, color = Colour 0.02 0.73 0.80 0.20, borderColor = Colour -0.51 0.30 0.37 1.00, borderSize = 1.0, shape = RectSharpGlyph 0.5142868897986053, rotation = Nothing, translate = Nothing}) [Point 490.0 162.0],GlyphChart (GlyphStyle {size = 61.99992, color = Colour 0.02 0.73 0.80 0.20, borderColor = Colour -0.51 0.30 0.37 1.00, borderSize = 1.0, shape = RectSharpGlyph 0.5806459105108522, rotation = Nothing, translate = Nothing}) [Point 31.0 90.0],GlyphChart (GlyphStyle {size = 70.99992, color = Colour 0.02 0.73 0.80 0.20, borderColor = Colour -0.51 0.30 0.37 1.00, borderSize = 1.0, shape = RectSharpGlyph 0.5070428248369857, rotation = Nothing, translate = Nothing}) [Point 36.0 162.0],GlyphChart (GlyphStyle {size = 58.99968, color = Colour 0.02 0.73 0.80 0.20, borderColor = Colour -0.51 0.30 0.37 1.00, borderSize = 1.0, shape = RectSharpGlyph 0.6101728009372255, rotation = Nothing, translate = Nothing}) [Point 193.0 90.0],GlyphChart (GlyphStyle {size = 54.0, color = Colour 0.02 0.73 0.80 0.20, borderColor = Colour -0.51 0.30 0.37 1.00, borderSize = 1.0, shape = RectSharpGlyph 0.6666666666666666, rotation = Nothing, translate = Nothing}) [Point 338.0 162.0],GlyphChart (GlyphStyle {size = 54.0, color = Colour 0.02 0.73 0.80 0.20, borderColor = Colour -0.51 0.30 0.37 1.00, borderSize = 1.0, shape = RectSharpGlyph 0.6666666666666666, rotation = Nothing, translate = Nothing}) [Point 77.0 234.0],GlyphChart (GlyphStyle {size = 54.0, color = Colour 0.02 0.73 0.80 0.20, borderColor = Colour -0.51 0.30 0.37 1.00, borderSize = 1.0, shape = RectSharpGlyph 0.6666666666666666, rotation = Nothing, translate = Nothing}) [Point 302.0 234.0],GlyphChart (GlyphStyle {size = 54.0, color = Colour 0.02 0.73 0.80 0.20, borderColor = Colour -0.51 0.30 0.37 1.00, borderSize = 1.0, shape = RectSharpGlyph 0.6666666666666666, rotation = Nothing, translate = Nothing}) [Point 266.0 162.0],GlyphChart (GlyphStyle {size = 54.0, color = Colour 0.02 0.73 0.80 0.20, borderColor = Colour -0.51 0.30 0.37 1.00, borderSize = 1.0, shape = RectSharpGlyph 0.6666666666666666, rotation = Nothing, translate = Nothing}) [Point 268.0 90.0],GlyphChart (GlyphStyle {size = 54.0, color = Colour 0.02 0.73 0.80 0.20, borderColor = Colour -0.51 0.30 0.37 1.00, borderSize = 1.0, shape = RectSharpGlyph 0.6666666666666666, rotation = Nothing, translate = Nothing}) [Point 117.0 162.0],GlyphChart (GlyphStyle {size = 68.99976, color = Colour 0.02 0.73 0.80 0.20, borderColor = Colour -0.51 0.30 0.37 1.00, borderSize = 1.0, shape = RectSharpGlyph 0.5217409451858963, rotation = Nothing, translate = Nothing}) [Point 72.0 18.0],GlyphChart (GlyphStyle {size = 65.00016000000001, color = Colour 0.02 0.73 0.80 0.20, borderColor = Colour -0.51 0.30 0.37 1.00, borderSize = 1.0, shape = RectSharpGlyph 0.5538447905359002, rotation = Nothing, translate = Nothing}) [Point 113.0 90.0]]
 
 #+begin_src haskell :results output
 display c
