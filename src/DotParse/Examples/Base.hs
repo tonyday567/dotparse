@@ -188,4 +188,4 @@ toLink id_ = [i|<a href="https://hackage.haskell.org/package/base/docs/#{m}.html
 --
 -- ![NumHask Example](other/nh.svg)
 writeEqChart :: IO ()
-writeEqChart = writeChartOptions "other/eq.svg" (graphToChartWith (defaultChartConfig & #labelf .~ toLink & #chartColor .~ over lightness' (* 0.5) (palette1 2) & #chartBackgroundColor .~ set opac' 0.1 (palette1 1) & #textSize .~ 20 & #nodeHeight .~ 0.2 & #nodeSize .~ 0.2 & #vshift .~ (-3.7) & #chartScale .~ 20 & #chartHeight .~ 400) (dotGraphEq' Directed))
+writeEqChart = writeChartOptions "other/eq.svg" (graphToChartWith (defaultChartConfig & #labelf .~ toLink & #chartColor .~ over lightness' (* 0.5) (palette 2) & #chartBackgroundColor .~ set opac' 0.1 (palette 1) & #textSize .~ 20 & #nodeHeight .~ 0.2 & #nodeSize .~ 0.2 & #vshift .~ (-3.7) & #chartScale .~ 20 & #chartHeight .~ 400) (dotGraphEq' Directed))

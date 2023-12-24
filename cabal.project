@@ -2,3 +2,12 @@ packages:
   dotparse.cabal
   ../chart-svg/chart-svg.cabal
   ../prettychart/prettychart.cabal
+
+allow-newer:
+  string-interpolate:bytestring,
+  string-interpolate:template-haskell,
+  string-interpolate:text,
+  websockets:attoparsec,
+  websockets:bytestring,
+  websockets:text,
+  scotty:text,

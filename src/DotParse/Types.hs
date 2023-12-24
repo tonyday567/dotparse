@@ -107,6 +107,7 @@ import Prelude hiding (replicate)
 -- >>> import DotParse
 -- >>> import qualified Data.Map as Map
 -- >>> import qualified FlatParse.Basic as FP
+-- >>> import qualified Data.ByteString as BS
 -- >>> import FlatParse.Basic (runParser, Result)
 -- >>> :set -XOverloadedStrings
 
@@ -171,6 +172,28 @@ instance Semigroup Graph where
 
 instance Monoid Graph where
   mempty = Graph mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty
+
+
+-- | 'Directed' graph of size 1.
+--
+-- >>> BS.putStr $ dotPrint defaultDotConfig defaultGraph <> "\n"
+-- digraph {
+--     node [height=0.5;shape=circle]
+--     graph [overlap=false;size="1!";splines=spline]
+--     edge [arrowsize=0.5]
+--     rankdir="TB"
+--     }
+defaultGraph :: Graph
+defaultGraph =
+  mempty &
+  set (attL NodeType (ID "height")) (Just $ IDDouble 0.5) &
+  set (attL NodeType (ID "shape")) (Just $ ID "circle") &
+  set (attL GraphType (ID "overlap")) (Just $ ID "false") &
+  set (attL GraphType (ID "size")) (Just $ IDQuoted "1!") &
+  set (attL GraphType (ID "splines")) (Just $ ID "spline") &
+  set (attL EdgeType (ID "arrowsize")) (Just $ IDDouble 0.5) &
+  set #directed (Last (Just Directed)) &
+  set (gattL (ID "rankdir")) (Just (IDQuoted "TB"))
 
 -- | global attributes lens
 gattL :: ID -> Lens' Graph (Maybe ID)
@@ -581,18 +604,6 @@ digraph {
   }
 |]
 
--- | A default dot graph
---
--- >>> import qualified Data.ByteString.Char8 as B
--- >>> B.putStrLn $ dotPrint defaultDotConfig defaultGraph
--- digraph {
---     node [height=0.5;shape=circle]
---     graph [overlap=false;size="1!";splines=spline]
---     edge [arrowsize=0.5]
---     }
-defaultGraph :: Graph
-defaultGraph = runDotParser defaultBS
-
 balancedGraph :: Graph
 balancedGraph = defaultGraph & attL GraphType (ID "center") .~ Just (ID "true")
 
@@ -832,13 +843,13 @@ data ChartConfig = ChartConfig
 
 -- | default parameters
 defaultChartConfig :: ChartConfig
-defaultChartConfig = ChartConfig 500 72 0.5 (over lightness' (* 0.5) (palette1 0)) (set opac' 0.2 (palette1 0)) 0.5 0.5 (-3.7) 14 (Text.pack . label) NoEscapeText
+defaultChartConfig = ChartConfig 500 72 0.5 (over lightness' (* 0.5) (palette 0)) (set opac' 0.2 (palette 0)) 0.5 0.5 (-3.7) 14 (Text.pack . label) NoEscapeText
 
 -- | convert a 'Graph' processed via the graphviz commands to a 'ChartOptions'
 graphToChartWith :: ChartConfig -> Graph -> ChartOptions
 graphToChartWith cfg g =
   mempty
-    & #charts .~ named "edges" ps <> named "shapes" c0 <> named "labels" [ts]
+    & #chartTree .~ named "edges" ps <> named "shapes" c0 <> named "labels" [ts]
     & #markupOptions % #markupHeight .~ (Just $ cfg ^. #chartHeight)
     & #markupOptions % #chartAspect .~ ChartAspect
     & #hudOptions .~ mempty

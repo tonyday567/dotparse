@@ -2,6 +2,15 @@
 
 [[https://hackage.haskell.org/package/dotparse][file:https://img.shields.io/hackage/v/dotparse.svg]] [[https://github.com/tonyday567/chart-svg/actions?query=workflow%3Ahaskell-ci][file:https://github.com/tonyday567/dotparse/workflows/haskell-ci/badge.svg]]
 
+* tools
+
+[[https://sketchviz.com/new][Sketchviz - Create and publish Graphviz graphs on the web for free]]
+
+[[https://medium.com/@zeruhur/making-sketchy-diagrams-on-your-local-machine-903d13e20a13#id_token=eyJhbGciOiJSUzI1NiIsImtpZCI6IjliMDI4NWMzMWJmZDhiMDQwZTAzMTU3YjE5YzRlOTYwYmRjMTBjNmYiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhenAiOiIyMTYyOTYwMzU4MzQtazFrNnFlMDYwczJ0cDJhMmphbTRsamRjbXMwMHN0dGcuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJhdWQiOiIyMTYyOTYwMzU4MzQtazFrNnFlMDYwczJ0cDJhMmphbTRsamRjbXMwMHN0dGcuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMDQ5MjM2MTMxMjM3NzI2MTkwNzQiLCJlbWFpbCI6InRvbnlkYXk1NjdAZ21haWwuY29tIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsIm5iZiI6MTcwMzM2ODU3MSwibmFtZSI6IlRvbnkgRGF5IiwicGljdHVyZSI6Imh0dHBzOi8vbGgzLmdvb2dsZXVzZXJjb250ZW50LmNvbS9hL0FDZzhvY0tpS19JSmJFY0hPOGtOdWEzTkJZN1RsYS03YUZDZTVybHBveGhlSGN6cVJZaz1zOTYtYyIsImdpdmVuX25hbWUiOiJUb255IiwiZmFtaWx5X25hbWUiOiJEYXkiLCJsb2NhbGUiOiJlbiIsImlhdCI6MTcwMzM2ODg3MSwiZXhwIjoxNzAzMzcyNDcxLCJqdGkiOiJiZjdmOTkyMzc3OTkwNWMwMmYwNGZkMWFmNzc4NDQzNmVmZDk5ZmFjIn0.sJtrYarRihx2EF9HENxsuM9Ith3RChTjHqRAumQ7TTZqZ-iL50BXQ4QmEbHp-lAPV8MOjAQmcTJQ4NcEqfiOIcljSYD8RBw0zLmL3HNnKV3PNkPJQ1e4lFgaVSWx3mHat1Hj9FZ1L3xH5B96Ln4_Y9anXmGnjFvcJIPQJyBBu-w85mhk3AuEGUIa5kR-H8FNXz-Mjqu7wxjrY_RPazwklm6q6J9n5EXz6wXFUEG6Bz0hbRTt4im6WUP_peLBrWxwvqmIY1e-FIvGNJxBLCkWpa4F-utjXxYlT35fh2dKp23v5y300sUtKDB9zbLESAwlDcfea3bVKAS6a7gRENHgQA][Making “sketchy” diagrams on your local machine | by Roberto Bisceglie | Medium]]
+
+[[https://github.com/gpotter2/sketchviz][GitHub - gpotter2/sketchviz: A command line clone of https://sketchviz.com/]]
+
+
 * Introduction
 
 Parsing and printing for the dot language of graphviz.
@@ -197,24 +206,29 @@ writeChartOptions "other/exga.svg" (graphToChartWith defaultChartConfig exGraphA
 
 ** imports
 
-#+begin_src haskell :results output
+#+begin_src haskell-ng :results output
 :reload
-:set prompt "> "
 :set -XOverloadedLabels
 :set -XOverloadedStrings
 :set -Wno-type-defaults
+:set -Wno-x-partial
 :set -XImportQualifiedPost
 import Chart
 import Optics.Core
 import FlatParse.Basic qualified as FP
 import qualified Data.ByteString as BS
+import qualified Data.Text as Text
 import qualified Data.ByteString.Char8 as Char8
+import Algebra.Graph qualified as G
+import Data.Monoid
 import GHC.Exts
 import DotParse
 import DotParse.Examples
+import DotParse.Examples.AST
 import DotParse.Examples.NumHask
 import DotParse.Examples.Base
 import Data.Proxy
+import Text.Pretty.Simple
 import Prettychart
 serve = startChartServer (Just "dotparse")
 (display, quit) <- serve
@@ -222,10 +236,17 @@ print "ok"
 #+end_src
 
 #+RESULTS:
-: [4 of 7] Compiling DotParse         ( src/DotParse.hs, interpreted ) [Flags changed]
-: Ok, 7 modules loaded.
+: Ok, 8 modules loaded.
 : Setting phasers to stun... (port 9160) (ctrl-c to quit)
-: ok
+: "ok"
+
+** AST example
+
+#+begin_src haskell-ng :results output
+writeNHChart
+#+end_src
+
+#+RESULTS:
 
 ** write examples
 
@@ -634,3 +655,60 @@ display c
 
 #+RESULTS:
 : True
+
+
+* debug
+
+#+begin_src haskell-ng :results output
+display $ (graphToChartWith (defaultChartConfig & #labelf .~ (Text.pack . show) & #chartColor .~ over lightness' (* 0.5) (palette 2) & #chartBackgroundColor .~ set opac' 0.0 (palette 1)) (dotGraphAST Directed))
+#+end_src
+
+#+RESULTS:
+: True
+
+#+begin_src haskell-ng :results output
+import Chart.Examples
+display unitExample
+#+end_src
+
+#+RESULTS:
+: True
+
+#+begin_src haskell-ng :results output
+pPrint $ dotPrint defaultDotConfig $ dotGraphAST Directed
+#+end_src
+
+#+RESULTS:
+#+begin_example
+"digraph {
+    node [height=0.5;shape=box]
+    graph [overlap=false;size="1!";splines=spline]
+    edge [arrowsize=0.5]
+    rankdir="BT"
+    "markupHeight"
+    "RenderStyle"
+    "MarkupOptions"
+    "HudOptions"
+    "CssOptions"
+    "ChartTree"
+    "ChartOptions"
+    "ChartAspect"
+    ""
+    "markupHeight" -> "MarkupOptions"
+    "RenderStyle" -> "MarkupOptions"
+    "MarkupOptions" -> "ChartOptions"
+    "HudOptions" -> "ChartOptions"
+    "CssOptions" -> "MarkupOptions"
+    "ChartTree" -> "ChartOptions"
+    "ChartOptions" -> ""
+    "ChartAspect" -> "MarkupOptions"
+    }"
+#+end_example
+
+#+begin_src haskell-ng :results output
+:t defaultGraph & #directed .~ Last (Just Directed) & addStatements (toStatements Directed (FP.strToUtf8 <$> (G.edges ((\c -> (view #super c, view #name c)) <$> components) <> G.vertices (view #name <$> components)))) & attL NodeType (ID "shape") .~ Just (ID "box") & gattL (ID "rankdir") .~ Just (IDQuoted "TB")
+#+end_src
+
+  #+RESULTS:
+  : defaultGraph & #directed .~ Last (Just Directed) & addStatements (toStatements Directed (FP.strToUtf8 <$> (G.edges ((\c -> (view #super c, view #name c)) <$> components) <> G.vertices (view #name <$> components)))) & attL NodeType (ID "shape") .~ Just (ID "box") & gattL (ID "rankdir") .~ Just (IDQuoted "TB")
+  :   :: Graph
