@@ -20,7 +20,6 @@ module DotParse.Types
     gattL,
     attL,
     defaultGraph,
-    balancedGraph,
     processDotWith,
     processDot,
     processGraph,
@@ -310,6 +309,16 @@ instance DotParse Statement where
 --
 -- >>> runDotParser "<The <font color='red'><b>foo</b></font>,<br/> the <font point-size='20'>bar</font> and<br/> the <i>baz</i>>" :: ID
 -- IDHtml "<The <font color='red'><b>foo</b></font>,<br/> the <font point-size='20'>bar</font> and<br/> the <i>baz</i>>"
+--
+-- >>> runDotParser "shape=diamond" :: (ID,ID)
+-- (ID "shape",ID "diamond")
+--
+-- >>> runDotParser "fontname=\"Arial\"" :: (ID,ID)
+-- (ID "fontname",IDQuoted "Arial")
+--
+-- >>> runDotParser "[shape=diamond; color=blue] [label=label]" :: Map.Map ID ID
+-- fromList [(ID "color",ID "blue"),(ID "label",ID "label"),(ID "shape",ID "diamond")]
+--
 data ID = ID ByteString | IDInt Int | IDDouble Double | IDQuoted ByteString | IDHtml ByteString deriving (Eq, Show, Generic, Ord)
 
 instance DotParse ID where
@@ -342,11 +351,6 @@ label (IDHtml h) = utf8ToStr h
 
 -- | Attribute key-value pair of identifiers
 --
--- >>> runDotParser "shape=diamond" :: (ID,ID)
--- (ID "shape",ID "diamond")
---
--- >>> runDotParser "fontname=\"Arial\"" :: (ID,ID)
--- (ID "fontname",IDQuoted "Arial")
 instance DotParse (ID, ID) where
   dotPrint cfg (x0, x1) = dotPrint cfg x0 <> "=" <> dotPrint cfg x1
 
@@ -358,9 +362,6 @@ instance DotParse (ID, ID) where
       pure (x0, x1)
 
 -- | Attribute collections
---
--- >>> runDotParser "[shape=diamond; color=blue] [label=label]" :: Map.Map ID ID
--- fromList [(ID "color",ID "blue"),(ID "label",ID "label"),(ID "shape",ID "diamond")]
 --
 -- A given entity can have multiple attribute lists. For simplicity, these are mconcat'ed on parsing.
 instance DotParse (Map.Map ID ID) where
@@ -590,9 +591,6 @@ addStatement (StatementGlobalAttribute (GlobalAttributeStatement s)) g = g & #gl
 -- | add a list of graphviz statements to a 'Graph'
 addStatements :: [Statement] -> Graph -> Graph
 addStatements ss g = Prelude.foldr addStatement g ss
-
-balancedGraph :: Graph
-balancedGraph = defaultGraph & attL GraphType (ID "center") .~ Just (ID "true")
 
 -- | run a dot string through graphviz, supplying arguments and collecting stdout
 processDotWith :: Directed -> [String] -> ByteString -> IO ByteString
