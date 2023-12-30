@@ -318,7 +318,6 @@ instance DotParse Statement where
 --
 -- >>> runDotParser "[shape=diamond; color=blue] [label=label]" :: Map.Map ID ID
 -- fromList [(ID "color",ID "blue"),(ID "label",ID "label"),(ID "shape",ID "diamond")]
---
 data ID = ID ByteString | IDInt Int | IDDouble Double | IDQuoted ByteString | IDHtml ByteString deriving (Eq, Show, Generic, Ord)
 
 instance DotParse ID where
@@ -350,7 +349,6 @@ label (IDQuoted q) = utf8ToStr q
 label (IDHtml h) = utf8ToStr h
 
 -- | Attribute key-value pair of identifiers
---
 instance DotParse (ID, ID) where
   dotPrint cfg (x0, x1) = dotPrint cfg x0 <> "=" <> dotPrint cfg x1
 
