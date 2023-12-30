@@ -836,20 +836,20 @@ graphToChartWith cfg labelf g =
   mempty
     & set #chartTree (named "edges" ps <> named "shapes" c0 <> named "labels" [ts])
     & set (#chartTree % charts' % each % #chartStyle % #scaleP) ScalePArea
-      & #markupOptions
-      % #markupHeight
-      .~ (Just $ cfg ^. #chartHeight)
-      & #markupOptions
-      % #chartAspect
-      .~ ChartAspect
-      & #hudOptions
-      .~ mempty
+    & #markupOptions
+    % #markupHeight
+    .~ (Just $ cfg ^. #chartHeight)
+    & #markupOptions
+    % #chartAspect
+    .~ ChartAspect
+    & #hudOptions
+    .~ mempty
   where
     glyphs w = case view (attL NodeType (ID "shape")) g of
       Just (ID "circle") -> defaultGlyphStyle & #glyphShape .~ CircleGlyph & #size .~ (cfg ^. #chartScale) * w & #borderSize .~ (cfg ^. #edgeSize) & #borderColor .~ (cfg ^. #chartColor) & #color .~ (cfg ^. #chartBackgroundColor)
-      Just (ID "box") -> defaultGlyphStyle & #glyphShape .~ RectSharpGlyph (h / w) & #size .~ (cfg ^. #chartScale) * w & #borderSize .~ (view #nodeBorderSize cfg) & #borderColor .~ (cfg ^. #chartColor) & #color .~ (cfg ^. #chartBackgroundColor)
+      Just (ID "box") -> defaultGlyphStyle & #glyphShape .~ RectSharpGlyph (h / w) & #size .~ (cfg ^. #chartScale) * w & #borderSize .~ view #nodeBorderSize cfg & #borderColor .~ (cfg ^. #chartColor) & #color .~ (cfg ^. #chartBackgroundColor)
       -- defaults to circle
-      _ -> defaultGlyphStyle & #glyphShape .~ CircleGlyph & #size .~ (cfg ^. #chartScale) * w & #borderSize .~ (view #nodeBorderSize cfg) & #borderColor .~ (cfg ^. #chartColor) & #color .~ (cfg ^. #chartBackgroundColor)
+      _ -> defaultGlyphStyle & #glyphShape .~ CircleGlyph & #size .~ (cfg ^. #chartScale) * w & #borderSize .~ view #nodeBorderSize cfg & #borderColor .~ (cfg ^. #chartColor) & #color .~ (cfg ^. #chartBackgroundColor)
     h = maybe (cfg ^. #backupNodeHeight) (runParser_ double . strToUtf8 . label) (view (attL NodeType (ID "height")) g)
     vshift' = cfg ^. #chartVshift
     -- node information

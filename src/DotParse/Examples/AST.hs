@@ -8,6 +8,7 @@ module DotParse.Examples.AST where
 import Algebra.Graph.Labelled qualified as L
 import Data.ByteString (ByteString)
 import Data.ByteString.Char8 qualified as B
+import Data.List qualified as List
 import Data.List.NonEmpty hiding (filter, head, length, map, zip, zipWith, (!!))
 import Data.Map.Strict qualified as Map
 import Data.Maybe
@@ -48,7 +49,7 @@ graphVs cs =
 
 -- | Convert sub-components to a list of class, subcomponent bytestring tuples.
 subs :: SubComponents -> [(ByteString, ByteString)]
-subs c = (view #classComponent c,) <$> (view #subComponents c)
+subs c = (view #classComponent c,) <$> view #subComponents c
 
 -- | algebraic graph edges
 graphEs :: [ComponentEdge] -> L.Graph (Maybe ByteString) (ByteString, ByteString)
@@ -62,26 +63,25 @@ graphAST cs es =
 
 -- | Create a list of 'SubComponents' from a list of 'ComponentEdge's
 fromCEs :: [ComponentEdge] -> [SubComponents]
-fromCEs es = fmap (uncurry SubComponents) $ Map.toList $ Map.fromListWith (<>) (((\e -> (view #edgeClassComponent e, [view #edgeSubComponent e]))) <$> es)
+fromCEs es = fmap (uncurry SubComponents) $ Map.toList $ Map.fromListWith (<>) ((\e -> (view #edgeClassComponent e, [view #edgeSubComponent e])) <$> es)
 
 -- | Convert an algebraic Graph into dot record nodes
 recordNodes :: L.Graph (Maybe ByteString) (ByteString, ByteString) -> [Statement]
 recordNodes g = (\(s, cs) -> StatementNode $ NodeStatement (IDQuoted s) Nothing (Map.fromList ([(ID "label", IDQuoted (ls (s, cs)))] <> maybe [] (\url -> [(ID "URL", IDQuoted url)]) (toURL s)))) <$> supers
   where
-    ls (s, cs) = B.intercalate "|" $ ("<x" <> s <> "> " <> s) : (fmap (\y -> " <x" <> y <> "> " <> y)) cs
-    supers = (\(s, cs) -> (s, filter (/= s) cs)) <$> (Map.toList $ Map.fromListWith (++) (((\(s, c) -> (s, [c]))) <$> L.vertexList g))
+    ls (s, cs) = B.intercalate "|" $ ("<x" <> s <> "> " <> s) : fmap (\y -> " <x" <> y <> "> " <> y) cs
+    supers = (\(s, cs) -> (s, filter (/= s) cs)) <$> (Map.toList $ Map.fromListWith (++) ((\(s, c) -> (s, [c])) <$> L.vertexList g))
 
 -- | Convert an algebraic Graph into dot edges
 recordEdges :: Directed -> L.Graph (Maybe ByteString) (ByteString, ByteString) -> [Statement]
 recordEdges d g =
-  ( ( \(l, (s0, c0), (s1, c1)) ->
-        StatementEdge $
-          EdgeStatement
-            (fromDirected d)
-            (EdgeID (IDQuoted s0) (Just (Port (This (IDQuoted ("x" <> c0))))))
-            (fromList [EdgeID (IDQuoted c1) (Just (Port (This (IDQuoted ("x" <> s1)))))])
-            (Map.fromList [(ID "label", IDQuoted (fromMaybe "x" l))])
-    )
+  ( \(l, (s0, c0), (s1, c1)) ->
+      StatementEdge $
+        EdgeStatement
+          (fromDirected d)
+          (EdgeID (IDQuoted s0) (Just (Port (This (IDQuoted ("x" <> c0))))))
+          (fromList [EdgeID (IDQuoted c1) (Just (Port (This (IDQuoted ("x" <> s1)))))])
+          (Map.fromList [(ID "label", IDQuoted (fromMaybe "x" l))])
   )
     <$> L.edgeList g
 
@@ -97,7 +97,7 @@ toStatementsRecord d g =
 toURL :: ByteString -> Maybe ByteString
 toURL name = fmap (\i' -> [i|https://hackage.haskell.org/package/#{view #itemPackage i'}/docs/#{view #itemModule i'}.html\#t:#{view #item i'}|]) item
   where
-    item = listToMaybe (filter ((== name) . view #item) itemModules)
+    item = List.find ((== name) . view #item) itemModules
 
 -- | AST 'Graph'
 --

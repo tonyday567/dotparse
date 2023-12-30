@@ -222,4 +222,3 @@ dotGraphNH d =
     .~ Just (ID "box")
     & gattL (ID "rankdir")
     .~ Just (IDQuoted "BT")
-
