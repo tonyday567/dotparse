@@ -516,7 +516,7 @@ svgAll =
 --
 -- >>> exGraph = defaultGraph & addStatements (toStatements Directed (Char8.pack . show <$> exAGraph))
 -- >>> exGraphAugmented <- processGraph exGraph
--- >>> writeChartOptions "other/exga.svg" (graphToChartWith defaultChartConfig exGraphAugmented)
+-- >>> writeChartOptions "other/exga.svg" (graphToChart exGraphAugmented)
 --
 -- ![augmentation example](other/exga.svg)
 exAGraph :: G.Graph Int

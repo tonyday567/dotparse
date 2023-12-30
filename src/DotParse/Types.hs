@@ -91,7 +91,6 @@ import Data.Map.Strict qualified as Map
 import Data.Maybe
 import Data.Monoid
 import Data.Proxy
-import Data.String.Interpolate
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.These
@@ -173,7 +172,6 @@ instance Semigroup Graph where
 instance Monoid Graph where
   mempty = Graph mempty mempty mempty mempty mempty mempty mempty mempty mempty mempty
 
-
 -- | 'Directed' graph of size 1.
 --
 -- >>> BS.putStr $ dotPrint defaultDotConfig defaultGraph <> "\n"
@@ -185,15 +183,15 @@ instance Monoid Graph where
 --     }
 defaultGraph :: Graph
 defaultGraph =
-  mempty &
-  set (attL NodeType (ID "height")) (Just $ IDDouble 0.5) &
-  set (attL NodeType (ID "shape")) (Just $ ID "circle") &
-  set (attL GraphType (ID "overlap")) (Just $ ID "false") &
-  set (attL GraphType (ID "size")) (Just $ IDQuoted "1!") &
-  set (attL GraphType (ID "splines")) (Just $ ID "spline") &
-  set (attL EdgeType (ID "arrowsize")) (Just $ IDDouble 0.5) &
-  set #directed (Last (Just Directed)) &
-  set (gattL (ID "rankdir")) (Just (IDQuoted "TB"))
+  mempty
+    & set (attL NodeType (ID "height")) (Just $ IDDouble 0.5)
+    & set (attL NodeType (ID "shape")) (Just $ ID "circle")
+    & set (attL GraphType (ID "overlap")) (Just $ ID "false")
+    & set (attL GraphType (ID "size")) (Just $ IDQuoted "1!")
+    & set (attL GraphType (ID "splines")) (Just $ ID "spline")
+    & set (attL EdgeType (ID "arrowsize")) (Just $ IDDouble 0.5)
+    & set #directed (Last (Just Directed))
+    & set (gattL (ID "rankdir")) (Just (IDQuoted "TB"))
 
 -- | global attributes lens
 gattL :: ID -> Lens' Graph (Maybe ID)
@@ -235,9 +233,12 @@ instance DotParse Graph where
     ss <- wrapCurlyP (many dotParse)
     let g =
           (mempty :: Graph)
-            & #strict .~ Last (Just me)
-            & #directed .~ Last (Just d)
-            & #graphid .~ Last i
+            & #strict
+            .~ Last (Just me)
+            & #directed
+            .~ Last (Just d)
+            & #graphid
+            .~ Last i
     pure $ addStatements ss g
 
 -- * Dot Grammar
@@ -590,20 +591,6 @@ addStatement (StatementGlobalAttribute (GlobalAttributeStatement s)) g = g & #gl
 addStatements :: [Statement] -> Graph -> Graph
 addStatements ss g = Prelude.foldr addStatement g ss
 
--- | default dot graph as a ByteString
-defaultBS :: ByteString
-defaultBS =
-  [i|
-digraph {
-    node [shape=circle
-         ,height=0.5];
-    graph [overlap=false
-          ,splines=spline
-          ,size="1!"];
-    edge [arrowsize=0.5];
-  }
-|]
-
 balancedGraph :: Graph
 balancedGraph = defaultGraph & attL GraphType (ID "center") .~ Just (ID "true")
 
@@ -710,15 +697,15 @@ setEdges_ :: Graph -> Map.Map (ID, ID) (Map.Map ID ID) -> Graph
 setEdges_ g m =
   g
     & #edges
-      .~ ( ( \((x0, x1), as) ->
-               EdgeStatement
-                 (fromDirected (defDirected $ view #directed g))
-                 (EdgeID x0 Nothing)
-                 (EdgeID x1 Nothing :| [])
-                 as
-           )
-             <$> Map.toList m
+    .~ ( ( \((x0, x1), as) ->
+             EdgeStatement
+               (fromDirected (defDirected $ view #directed g))
+               (EdgeID x0 Nothing)
+               (EdgeID x1 Nothing :| [])
+               as
          )
+           <$> Map.toList m
+       )
 
 -- | A specific attribute for all nodes in a graph
 nodesA :: ID -> Graph -> Map.Map ID (Maybe ID)
@@ -824,45 +811,49 @@ toStatements d g =
        )
 
 -- | Various configutaion parameters for the chart-svg Chart
--- FIXME:
--- chartScale, nodeHeight, nodeSize seem to have no effect
 data ChartConfig = ChartConfig
   { chartHeight :: Double,
     chartScale :: Double,
     edgeSize :: Double,
+    nodeBorderSize :: Double,
     chartColor :: Colour,
     chartBackgroundColor :: Colour,
-    nodeHeight :: Double,
-    nodeSize :: Double,
-    vshift :: Double,
+    backupNodeHeight :: Double,
+    backupNodeWidth :: Double,
+    chartVshift :: Double,
     textSize :: Double,
-    labelf :: ID -> Text,
     escapeText :: EscapeText
   }
-  deriving (Generic)
+  deriving (Generic, Show, Eq)
 
 -- | default parameters
 defaultChartConfig :: ChartConfig
-defaultChartConfig = ChartConfig 500 72 0.5 (over lightness' (* 0.5) (palette 0)) (set opac' 0.2 (palette 0)) 0.5 0.5 (-3.7) 14 (Text.pack . label) NoEscapeText
+defaultChartConfig = ChartConfig 500 72 0.5 1 (grey 0.4 0.8) (grey 0.5 0.2) 0.5 0.5 (-6) 16 NoEscapeText
 
 -- | convert a 'Graph' processed via the graphviz commands to a 'ChartOptions'
-graphToChartWith :: ChartConfig -> Graph -> ChartOptions
-graphToChartWith cfg g =
+graphToChartWith :: ChartConfig -> (ID -> Text) -> Graph -> ChartOptions
+graphToChartWith cfg labelf g =
   mempty
-    & #chartTree .~ named "edges" ps <> named "shapes" c0 <> named "labels" [ts]
-    & #markupOptions % #markupHeight .~ (Just $ cfg ^. #chartHeight)
-    & #markupOptions % #chartAspect .~ ChartAspect
-    & #hudOptions .~ mempty
+    & set #chartTree (named "edges" ps <> named "shapes" c0 <> named "labels" [ts])
+    & set (#chartTree % charts' % each % #chartStyle % #scaleP) ScalePArea
+      & #markupOptions
+      % #markupHeight
+      .~ (Just $ cfg ^. #chartHeight)
+      & #markupOptions
+      % #chartAspect
+      .~ ChartAspect
+      & #hudOptions
+      .~ mempty
   where
     glyphs w = case view (attL NodeType (ID "shape")) g of
-      Just (ID "circle") -> defaultGlyphStyle & #shape .~ CircleGlyph & #size .~ (cfg ^. #chartScale) * w & #borderSize .~ (cfg ^. #edgeSize) & #borderColor .~ (cfg ^. #chartColor) & #color .~ (cfg ^. #chartBackgroundColor)
-      Just (ID "box") -> defaultGlyphStyle & #shape .~ RectSharpGlyph (h / w) & #size .~ (cfg ^. #chartScale) * w & #borderSize .~ 1 & #borderColor .~ (cfg ^. #chartColor) & #color .~ (cfg ^. #chartBackgroundColor)
+      Just (ID "circle") -> defaultGlyphStyle & #glyphShape .~ CircleGlyph & #size .~ (cfg ^. #chartScale) * w & #borderSize .~ (cfg ^. #edgeSize) & #borderColor .~ (cfg ^. #chartColor) & #color .~ (cfg ^. #chartBackgroundColor)
+      Just (ID "box") -> defaultGlyphStyle & #glyphShape .~ RectSharpGlyph (h / w) & #size .~ (cfg ^. #chartScale) * w & #borderSize .~ (view #nodeBorderSize cfg) & #borderColor .~ (cfg ^. #chartColor) & #color .~ (cfg ^. #chartBackgroundColor)
       -- defaults to circle
-      _ -> defaultGlyphStyle & #shape .~ CircleGlyph & #size .~ (cfg ^. #chartScale) * w & #borderSize .~ 1 & #borderColor .~ (cfg ^. #chartColor) & #color .~ (cfg ^. #chartBackgroundColor)
-    h = maybe (cfg ^. #nodeHeight) (runParser_ double . strToUtf8 . label) (view (attL NodeType (ID "height")) g)
-    vshift' = cfg ^. #vshift
+      _ -> defaultGlyphStyle & #glyphShape .~ CircleGlyph & #size .~ (cfg ^. #chartScale) * w & #borderSize .~ (view #nodeBorderSize cfg) & #borderColor .~ (cfg ^. #chartColor) & #color .~ (cfg ^. #chartBackgroundColor)
+    h = maybe (cfg ^. #backupNodeHeight) (runParser_ double . strToUtf8 . label) (view (attL NodeType (ID "height")) g)
+    vshift' = cfg ^. #chartVshift
     -- node information
-    ns = nodeInfo g (cfg ^. #nodeSize)
+    ns = nodeInfo g (cfg ^. #backupNodeWidth)
     -- edge information
     es = edgeInfo g (cfg ^. #edgeSize)
     -- paths
@@ -871,11 +862,11 @@ graphToChartWith cfg g =
     c0 = fmap (\(NodeInfo _ w p) -> GlyphChart (glyphs w) [p]) ns
     -- labels
     ts =
-      TextChart (defaultTextStyle & #escapeText .~ (cfg ^. #escapeText) & #size .~ (cfg ^. #textSize) & #color .~ (cfg ^. #chartColor)) ((\(NodeInfo l _ (Point x y)) -> ((cfg ^. #labelf) l, Point x (vshift' + y))) <$> ns)
+      TextChart (defaultTextStyle & #escapeText .~ (cfg ^. #escapeText) & #size .~ (cfg ^. #textSize) & #color .~ (cfg ^. #chartColor)) ((\(NodeInfo l _ (Point x y)) -> (labelf l, Point x (vshift' + y))) <$> ns)
 
 -- | convert a 'Graph' processed via the graphviz commands to a 'ChartOptions' using the default ChartConfig.
 graphToChart :: Graph -> ChartOptions
-graphToChart = graphToChartWith defaultChartConfig
+graphToChart = graphToChartWith defaultChartConfig (Text.pack . label)
 
 -- | Convert an algebraic graph to a dotparse graph.
 toDotGraphWith :: Directed -> Graph -> G.Graph ByteString -> Graph
