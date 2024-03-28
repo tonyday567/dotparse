@@ -50,10 +50,6 @@ Explore [[https://kowainik.github.io/posts/2019-01-14-tomland#tagged-partial-bid
 
 Steal design ideas from [[https://hackage.haskell.org/package/jordan][jordan]].
 
-Case-insensitive parsing blocked on [[https://github.com/AndrasKovacs/flatparse/issues/10][AndrasKovacs/flatparse#10 Case-insensitive keyword matching]].
-
-Exact printing of comments and whitespace.
-
 * process pipelines
 
 ** algebraic-graphs
@@ -216,16 +212,20 @@ import DotParse
 import DotParse.Examples
 import DotParse.Examples.AST
 import DotParse.Examples.NumHask
-import DotParse.Examples.Base
 import Data.Proxy
 print "ok"
 #+end_src
+
+#+RESULTS:
+: [6 of 7] Compiling DotParse.Examples.NumHask ( src/DotParse/Examples/NumHask.hs, interpreted ) [Source file changed]
+: Ok, 7 modules loaded.
+: "ok"
 
 ** testAll
 
 Round-trip test
 
-#+begin_src haskell :results output
+#+begin_src haskell-ng :results output
 testAll
 #+end_src
 
@@ -249,14 +249,27 @@ ex14
 ex15
 #+end_example
 
+** numhask
+
+#+begin_src haskell-ng :results output
+g <- processGraph (dotGraphNH Directed)
+writeChartOptions "other/nh12.svg" (graphToChartWith (defaultChartConfig & set #chartVshift (-4) & set #textSize 12) toLinkNH g)
+#+end_src
+
+#+RESULTS:
+
+
 * chart-svg AST
 
 #+begin_src haskell-ng :results output
 g1 = dotAST allSC componentEdges
-BS.writeFile "other/ast.dot" $ dotPrint defaultDotConfig g1
+BS.writeFile "other/chart-svg-ast.dot" $ dotPrint defaultDotConfig g1
 #+end_src
+
+#+RESULTS:
 
 #+begin_src sh :results output
-dot other/ast.dot -Tsvg >other/ast.svg
+dot other/chart-svg-ast.dot -Tsvg >other/chart-svg-ast.svg
 #+end_src
 
+#+RESULTS:

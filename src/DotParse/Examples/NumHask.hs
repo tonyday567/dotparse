@@ -42,6 +42,7 @@ data Class
   | Semiring
   | Ring
   | IntegralDomain
+  | SemiField
   | Field
   | ExpField
   | QuotientField
@@ -77,7 +78,7 @@ data Dependency = Dependency
   }
   deriving (Show, Eq, Ord)
 
--- | List of all dependencies (as at v0.11)
+-- | List of all dependencies (as at v0.12)
 dependencies :: [Dependency]
 dependencies =
   [ Dependency Unital Magma,
@@ -110,10 +111,11 @@ dependencies =
     Dependency Ring Subtractive,
     Dependency IntegralDomain Ring,
     Dependency Field Ring,
+    Dependency SemiField Distributive,
+    Dependency SemiField Divisive,
     Dependency Field Divisive,
     Dependency ExpField Field,
-    Dependency QuotientField Field,
-    Dependency QuotientField Ring,
+    Dependency QuotientField SemiField,
     Dependency TrigField Field,
     Dependency UpperBoundedField Field,
     Dependency LowerBoundedField Field,
@@ -122,7 +124,6 @@ dependencies =
     Dependency SubtractiveAction Subtractive,
     Dependency MultiplicativeAction Multiplicative,
     Dependency DivisiveAction Divisive,
-    Dependency Actions Distributive,
     -- Lattice
     Dependency JoinSemiLattice Associative,
     Dependency JoinSemiLattice Commutative,
@@ -142,7 +143,7 @@ dependencies =
     Dependency Direction Distributive,
     Dependency Epsilon Subtractive,
     Dependency Epsilon MeetSemiLattice,
-    Dependency Integral Ring,
+    Dependency Integral Distributive,
     Dependency Ratio Field
   ]
 
@@ -155,13 +156,13 @@ classesNH =
     Divisive,
     Distributive,
     Ring,
+    SemiField,
     Field,
     ExpField,
     QuotientField,
     TrigField,
     Basis,
     Direction,
-    Actions,
     Integral,
     Ratio
   ]
@@ -173,9 +174,10 @@ classesModule =
     (Subtractive, "NumHask-Algebra-Additive"),
     (Multiplicative, "NumHask-Algebra-Multiplicative"),
     (Divisive, "NumHask-Algebra-Multiplicative"),
-    (Distributive, "NumHask-Algebra-Distributive"),
+    (Distributive, "NumHask-Algebra-Ring"),
     (Ring, "NumHask-Algebra-Ring"),
     (Field, "NumHask-Algebra-Field"),
+    (SemiField, "NumHask-Algebra-Field"),
     (ExpField, "NumHask-Algebra-Field"),
     (QuotientField, "NumHask-Algebra-Field"),
     (TrigField, "NumHask-Algebra-Field"),
