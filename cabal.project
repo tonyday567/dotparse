@@ -5,4 +5,3 @@ write-ghc-environment-files: always
 
 tests: true
 
-allow-newer: markup-parse:containers
