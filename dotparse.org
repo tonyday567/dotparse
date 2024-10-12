@@ -55,7 +55,7 @@ Steal design ideas from [[https://hackage.haskell.org/package/jordan][jordan]].
 ** algebraic-graphs
 Starting with a Graph from algebraic-graphs:
 
-#+begin_src haskell
+#+begin_src haskell-ng
 import qualified Algebra.Graph as G
 :{
 exAGraph :: G.Graph Int
@@ -70,7 +70,7 @@ exAGraph =
 #+RESULTS:
 : ghci| ghci| ghci| ghci| ghci| ghci| ghci|
 
-#+begin_src haskell :results output :exports both
+#+begin_src haskell-ng :results output :exports both
 exAGraph
 #+end_src
 
@@ -81,7 +81,7 @@ exAGraph
 
 Convert to a dotparse Graph
 
-#+begin_src haskell
+#+begin_src haskell-ng
 exGraph = defaultGraph & addStatements (toStatements Directed (Char8.pack . show <$> exAGraph))
 #+end_src
 
@@ -89,7 +89,7 @@ exGraph = defaultGraph & addStatements (toStatements Directed (Char8.pack . show
 
 Encode graph as a ByteString (prior to processing via graphviz)
 
-#+begin_src haskell :results output :exports both
+#+begin_src haskell-ng :results output :exports both
 BS.putStr (dotPrint defaultDotConfig exGraph)
 #+end_src
 
@@ -150,7 +150,7 @@ digraph {
 
 Directly create an SVG from the dotparse Graph
 
-#+begin_src haskell :file other/exdirect.svg :results output graphics file :exports both
+#+begin_src haskell-ng :file other/exdirect.svg :results output graphics file :exports both
 (\b f -> processDotWith Directed ["-Tsvg", "-o", "other/" <> f <> ".svg"] b) (dotPrint defaultDotConfig exGraph) "exdirect"
         #+end_src
 
@@ -161,7 +161,7 @@ Directly create an SVG from the dotparse Graph
 
 ByteString of the processed Graph
 
-#+begin_src haskell :results output
+#+begin_src haskell-ng :results output
 BS.putStr =<< processDot Directed (dotPrint defaultDotConfig exInt)
 #+end_src
 
@@ -169,7 +169,7 @@ BS.putStr =<< processDot Directed (dotPrint defaultDotConfig exInt)
 
 Graph augmented by graphviz
 
-#+begin_src haskell
+#+begin_src haskell-ng
 exGraphAugmented <- processGraph exGraph
 :t exGraphAugmented
 #+end_src
@@ -181,7 +181,7 @@ exGraphAugmented <- processGraph exGraph
 
 SVG production via chart-svg
 
-#+begin_src haskell :file other/exga.svg :results output graphics file :exports both
+#+begin_src haskell-ng :file other/exga.svg :results output graphics file :exports both
 import Chart (writeChartOptions)
 writeChartOptions "other/exga.svg" (graphToChart exGraphAugmented)
 #+end_src
@@ -257,7 +257,6 @@ writeChartOptions "other/nh12.svg" (graphToChartWith (defaultChartConfig & set #
 #+end_src
 
 #+RESULTS:
-
 
 * chart-svg AST
 

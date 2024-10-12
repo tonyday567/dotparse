@@ -52,6 +52,7 @@ import NumHask.Space
 import Prelude hiding (replicate)
 
 -- $setup
+-- >>> :set -XOverloadedStrings
 -- >>> import DotParse
 -- >>> import FlatParse.Basic
 
