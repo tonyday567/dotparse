@@ -1,3 +1,7 @@
 packages:
   dotparse.cabal
 
+write-ghc-environment-files: always
+
+tests: true
+
