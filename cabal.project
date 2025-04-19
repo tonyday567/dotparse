@@ -5,3 +5,6 @@ write-ghc-environment-files: always
 
 tests: true
 
+allow-newer:
+  , tree-diff:base
+  , tree-diff:time
