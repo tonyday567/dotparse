@@ -1,5 +1,3 @@
-[![img](https://img.shields.io/hackage/v/dotparse.svg)](https://hackage.haskell.org/package/dotparse) [![img](https://github.com/tonyday567/dotparse/workflows/haskell-ci/badge.svg)](https://github.com/tonyday567/chart-svg/actions?query=workflow%3Ahaskell-ci)
-
 [![img](https://img.shields.io/hackage/v/dotparse.svg)](https://hackage.haskell.org/package/dotparse) [![img](https://github.com/tonyday567/dotparse/actions/workflows/haskell-ci.yml/badge.svg)](https://github.com/tonyday567/dotparse/actions/workflows/haskell-ci.yml)
 
 
