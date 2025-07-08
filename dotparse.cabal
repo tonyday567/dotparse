@@ -1,6 +1,6 @@
 cabal-version: 3.0
 name: dotparse
-version: 0.1.2.2
+version: 0.1.2.3
 license: BSD-3-Clause
 license-file: LICENSE
 copyright: Tony Day (c) 2020
@@ -107,7 +107,6 @@ test-suite doctests
   build-depends:
     base >=4.14 && <5,
     doctest-parallel >=0.3 && <0.5,
-    dotparse,
 
   ghc-options: -threaded
   type: exitcode-stdio-1.0
