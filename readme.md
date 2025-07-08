@@ -1,28 +1,5 @@
+[![img](https://img.shields.io/hackage/v/dotparse.svg)](https://hackage.haskell.org/package/dotparse) [![img](https://github.com/tonyday567/dotparse/actions/workflows/haskell-ci.yml/badge.svg)](https://github.com/tonyday567/dotparse/actions/workflows/haskell-ci.yml)
 
-# Table of Contents
-
-1.  [Introduction](#orgf187caa)
-    1.  [Reference](#org9cbd848)
-    2.  [Similar projects](#orgdec9e8f)
-    3.  [development wish list](#org97f432e)
-2.  [process pipelines](#orgd1d85da)
-    1.  [algebraic-graphs](#orgfab6886)
-    2.  [dotparse Graph](#orgb18c248)
-    3.  [dotPrint](#org3454fc8)
-    4.  [processDotWith](#org32b8f10)
-    5.  [processDot](#org73a9a3b)
-    6.  [processGraph](#org15407d1)
-    7.  [graphToChartWith](#orgf541717)
-3.  [Development](#org7bb46ff)
-    1.  [imports](#org2f672d9)
-    2.  [testAll](#orgee189c9)
-    3.  [numhask](#org176b014)
-4.  [chart-svg AST](#org223882c)
-
-[![img](https://img.shields.io/hackage/v/dotparse.svg)](https://hackage.haskell.org/package/dotparse) [![img](https://github.com/tonyday567/dotparse/workflows/haskell-ci/badge.svg)](https://github.com/tonyday567/chart-svg/actions?query=workflow%3Ahaskell-ci)
-
-
-<a id="orgf187caa"></a>
 
 # Introduction
 
@@ -36,8 +13,6 @@ Parsing and printing for the dot language of graphviz.
 -   Support rendering dot graphs using [chart-svg](https://hackage.haskell.org/package/chart-svg).
 -   Uses [flatparse](https://hackage.haskell.org/package/flatparse) for speedy parsing.
 
-
-<a id="org9cbd848"></a>
 
 ## Reference
 
@@ -58,16 +33,12 @@ Graphviz practical examples:
 <https://renenyffenegger.ch/notes/tools/Graphviz/attributes/label/HTML-like/index>
 
 
-<a id="orgdec9e8f"></a>
-
 ## Similar projects
 
 The [graphviz](https://hackage.haskell.org/package/graphviz) library aims for comprehensive typing of graphviz attributes and syntax. As a result, it is quite large and somewhat incomplete. In contrast, dotparse parsing is simpler, more robust and faster. It is also somewhat tied to fgl and I wanted to try a different graph library.
 
 [dotgen](https://hackage.haskell.org/package/dotgen) is a dot graph printer but not a parser. It supports a monadic style of printing. Specifically, it supports generation of unique names if that is an important feature of the problem domain.
 
-
-<a id="org97f432e"></a>
 
 ## development wish list
 
@@ -82,12 +53,8 @@ Explore [tagged partial birectional isomorphism](https://kowainik.github.io/post
 Steal design ideas from [jordan](https://hackage.haskell.org/package/jordan).
 
 
-<a id="orgd1d85da"></a>
-
 # process pipelines
 
-
-<a id="orgfab6886"></a>
 
 ## algebraic-graphs
 
@@ -110,16 +77,12 @@ Starting with a Graph from algebraic-graphs:
     Overlay (Connect (Vertex 0) (Vertex 1)) (Overlay (Connect (Vertex 1) (Vertex 2)) (Overlay (Connect (Vertex 2) (Vertex 3)) (Overlay (Connect (Vertex 3) (Vertex 4)) (Overlay (Connect (Vertex 4) (Vertex 5)) (Overlay (Connect (Vertex 5) (Vertex 0)) (Overlay (Connect (Vertex 0) (Vertex 6)) (Overlay (Connect (Vertex 0) (Vertex 12)) (Overlay (Connect (Vertex 1) (Vertex 7)) (Overlay (Connect (Vertex 1) (Vertex 13)) (Overlay (Connect (Vertex 2) (Vertex 8)) (Overlay (Connect (Vertex 2) (Vertex 14)) (Overlay (Connect (Vertex 3) (Vertex 9)) (Overlay (Connect (Vertex 3) (Vertex 15)) (Overlay (Connect (Vertex 4) (Vertex 10)) (Overlay (Connect (Vertex 4) (Vertex 16)) (Overlay (Connect (Vertex 5) (Vertex 11)) (Overlay (Connect (Vertex 5) (Vertex 17)) (Overlay (Connect (Vertex 2) (Vertex 18)) (Overlay (Connect (Vertex 2) (Vertex 19)) (Overlay (Connect (Vertex 15) (Vertex 18)) (Overlay (Connect (Vertex 15) (Vertex 19)) (Overlay (Connect (Vertex 18) (Vertex 3)) (Connect (Vertex 19) (Vertex 3))))))))))))))))))))))))
 
 
-<a id="orgb18c248"></a>
-
 ## dotparse Graph
 
 Convert to a dotparse Graph
 
     exGraph = defaultGraph & addStatements (toStatements Directed (Char8.pack . show <$> exAGraph))
 
-
-<a id="org3454fc8"></a>
 
 ## dotPrint
 
@@ -178,8 +141,6 @@ Encode graph as a ByteString (prior to processing via graphviz)
         }
 
 
-<a id="org32b8f10"></a>
-
 ## processDotWith
 
 Directly create an SVG from the dotparse Graph
@@ -189,16 +150,12 @@ Directly create an SVG from the dotparse Graph
 ![img](other/exdirect.svg)
 
 
-<a id="org73a9a3b"></a>
-
 ## processDot
 
 ByteString of the processed Graph
 
     BS.putStr =<< processDot Directed (dotPrint defaultDotConfig exInt)
 
-
-<a id="org15407d1"></a>
 
 ## processGraph
 
@@ -210,8 +167,6 @@ Graph augmented by graphviz
     exGraphAugmented :: Graph
 
 
-<a id="orgf541717"></a>
-
 ## graphToChartWith
 
 SVG production via chart-svg
@@ -222,12 +177,8 @@ SVG production via chart-svg
 ![img](other/exga.svg)
 
 
-<a id="org7bb46ff"></a>
-
 # Development
 
-
-<a id="org2f672d9"></a>
 
 ## imports
 
@@ -258,8 +209,6 @@ SVG production via chart-svg
     "ok"
 
 
-<a id="orgee189c9"></a>
-
 ## testAll
 
 Round-trip test
@@ -284,15 +233,11 @@ Round-trip test
     ex15
 
 
-<a id="org176b014"></a>
-
 ## numhask
 
     g <- processGraph (dotGraphNH Directed)
     writeChartOptions "other/nh12.svg" (graphToChartWith (defaultChartConfig & set #chartVshift (-4) & set #textSize 12) toLinkNH g)
 
-
-<a id="org223882c"></a>
 
 # chart-svg AST
 
