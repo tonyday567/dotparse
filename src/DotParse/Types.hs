@@ -578,9 +578,9 @@ instance DotParse SubGraphStatement where
 
 -- | add a graphviz statement to a 'Graph'
 addStatement :: Statement -> Graph -> Graph
-addStatement (StatementNode n) g = g & #nodes %~ (<> [n])
-addStatement (StatementEdge e) g = g & #edges %~ (<> [e])
-addStatement (StatementSubGraph s) g = g & #subgraphs %~ (<> [s])
+addStatement (StatementNode n) g = g & #nodes %~ (n :)
+addStatement (StatementEdge e) g = g & #edges %~ (e :)
+addStatement (StatementSubGraph s) g = g & #subgraphs %~ (s :)
 addStatement (StatementAttribute (AttributeStatement GraphType as)) g = g & #graphAttributes %~ (<> as)
 addStatement (StatementAttribute (AttributeStatement NodeType as)) g = g & #nodeAttributes %~ (<> as)
 addStatement (StatementAttribute (AttributeStatement EdgeType as)) g = g & #edgeAttributes %~ (<> as)
@@ -588,7 +588,7 @@ addStatement (StatementGlobalAttribute (GlobalAttributeStatement s)) g = g & #gl
 
 -- | add a list of graphviz statements to a 'Graph'
 addStatements :: [Statement] -> Graph -> Graph
-addStatements ss g = Prelude.foldr addStatement g ss
+addStatements ss g = Prelude.foldr addStatement g (Prelude.reverse ss)
 
 -- | run a dot string through graphviz, supplying arguments and collecting stdout
 processDotWith :: Directed -> [String] -> ByteString -> IO ByteString
