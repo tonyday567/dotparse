@@ -8,3 +8,11 @@ tests: true
 allow-newer:
   , tree-diff:base
   , tree-diff:time
+  , these:base
+  , indexed-traversable:base
+  , indexed-traversable-instances:base
+  , tdigest:base
+  , template-haskell:base
+  , algebraic-graphs:base
+  , *:containers
+  , *:template-haskell
