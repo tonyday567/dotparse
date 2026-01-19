@@ -13,7 +13,6 @@ import Algebra.Graph qualified as G
 import Control.Monad (zipWithM_)
 import Data.ByteString (ByteString)
 import Data.Proxy (Proxy (..))
-import Data.String.Interpolate
 import DotParse
 import Prelude hiding (replicate)
 
