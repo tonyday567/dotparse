@@ -11,7 +11,6 @@ Parsing and printing for the dot language of graphviz.
 -   Uses command-line graphviz programs \`dot\` and \`neato\` to augment dot graph specifications
 -   Supports conversion from and to [algebraic-graphs](https://hackage.haskell.org/package/algebraic-graphs).
 -   Support rendering dot graphs using [chart-svg](https://hackage.haskell.org/package/chart-svg).
--   Uses [flatparse](https://hackage.haskell.org/package/flatparse) for speedy parsing.
 
 
 ## Reference

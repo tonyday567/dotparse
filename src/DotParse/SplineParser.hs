@@ -1,12 +1,9 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes #-}
-{-# LANGUAGE TemplateHaskell #-}
 
--- | Lower-level flatparse parsers
-module DotParse.FlatParse
+-- | Lower-level parsers
+module DotParse.SplineParser
   ( Error (..),
     prettyError,
     keyword,
@@ -40,13 +37,14 @@ module DotParse.FlatParse
   )
 where
 
+import Control.Applicative ((<|>))
 import Data.Bool
-import Data.ByteString hiding (empty, head, length, map, zip, zipWith)
-import Data.ByteString.Char8 qualified as B
-import Data.Char hiding (isDigit)
-import Data.List.NonEmpty
-import DotParse.FlatParse.TH hiding (merge)
-import FlatParse.Basic hiding (cut)
+import Data.ByteString (ByteString)
+import Data.ByteString qualified as B
+import Data.ByteString.Char8 qualified as BC
+import Data.Char (ord)
+import Data.List.NonEmpty (NonEmpty (..))
+import DotParse.Parser
 import GHC.Generics
 import NumHask.Space
 import Prelude hiding (replicate)
@@ -54,23 +52,6 @@ import Prelude hiding (replicate)
 -- $setup
 -- >>> :set -XOverloadedStrings
 -- >>> import DotParse
--- >>> import FlatParse.Basic
-
--- | Run parser, print pretty error on failure.
-testParser :: (Show a) => Parser Error a -> ByteString -> IO ()
-testParser p b =
-  case runParser p b of
-    Err e -> B.putStrLn $ prettyError b e
-    OK a _ -> print a
-    Fail -> B.putStrLn "uncaught parse error"
-
--- | run a Parser, erroring on leftovers, Fail or Err
-runParser_ :: Parser Error a -> ByteString -> a
-runParser_ p b = case runParser p b of
-  OK r "" -> r
-  OK _ x -> error $ utf8ToStr $ "leftovers: " <> x
-  Fail -> error "Fail"
-  Err e -> error $ utf8ToStr $ prettyError b e
 
 -- * parsing
 
@@ -107,7 +88,7 @@ double :: Parser Error Double
 double = token do
   (placel, nl) <- digits
   withOption
-    ($(char '.') *> digits)
+    (char '.' *> digits)
     ( \(placer, nr) ->
         case (placel, placer) of
           (1, 1) -> empty
@@ -122,9 +103,9 @@ double = token do
 -- >>> runParser (signed double) "-1.234x"
 -- OK (-1.234) "x"
 signed :: (Num b) => Parser e b -> Parser e b
-signed p = withOption ($(char '-')) (const (((-1) *) <$> p)) p
+signed p = withOption (char '-') (const (((-1) *) <$> p)) p
 
--- | Looks ahead for a "/"" that may be in the quoted string.
+-- | Looks ahead for a "/" that may be in the quoted string.
 -- >>> runParser quoted (strToUtf8 "\"hello\"")
 -- OK "hello" ""
 --
@@ -132,31 +113,33 @@ signed p = withOption ($(char '-')) (const (((-1) *) <$> p)) p
 -- OK "hello\"" ""
 quoted :: Parser Error String
 quoted =
-  $(symbol "\"") *> many unquoteQuote <* $(symbol' "\"")
+  symbol "\"" *> many unquoteQuote <* symbol' "\""
 
 unquoteQuote :: Parser Error Char
 unquoteQuote = do
   next <- satisfy (/= '"')
   case next of
-    '/' -> branch (lookahead $(char '"')) ('"' <$ $(char '"')) (pure '/')
+    '/' -> branch (lookahead (char '"')) ('"' <$ char '"') (pure '/')
     x -> pure x
+
+-- | HTML-Like string parser
+htmlLike :: Parser e String
+htmlLike = ws *> char '<' *> go (1 :: Int) "<"
+  where
+    go 0 acc = ws *> pure (reverse acc)
+    go n acc =
+      (char '>' *> go (n - 1) ('>' : acc))
+        <|> (char '<' *> go (n + 1) ('<' : acc))
+        <|> (anyChar >>= \c -> go n (c : acc))
 
 -- | optional separators
 sepP :: Parser e ()
-sepP =
-  token
-    $( switch
-         [|
-           case _ of
-             ";" -> pure ()
-             "," -> pure ()
-           |]
-     )
+sepP = token (char ';' <|> char ',')
 
 -- | parse wrapping square brackets
 wrapSquareP :: Parser Error a -> Parser Error a
 wrapSquareP p =
-  $(symbol "[") *> p <* $(symbol' "]")
+  symbol "[" *> p <* symbol' "]"
 
 -- | print wrapping square brackets
 wrapSquarePrint :: ByteString -> ByteString
@@ -166,9 +149,9 @@ wrapSquarePrint b = "[" <> b <> "]"
 wrapQuotePrint :: ByteString -> ByteString
 wrapQuotePrint b = "\"" <> b <> "\""
 
--- | parse wrapping square brackets
+-- | parse wrapping curly brackets
 wrapCurlyP :: Parser Error a -> Parser Error a
-wrapCurlyP p = $(symbol "{") *> p <* $(symbol' "}")
+wrapCurlyP p = symbol "{" *> p <* symbol' "}"
 
 -- | print wrapping curly brackets
 wrapCurlyPrint :: ByteString -> ByteString
@@ -176,18 +159,24 @@ wrapCurlyPrint b = "{" <> b <> "}"
 
 -- | comma separated Point
 pointP :: Parser Error (Point Double)
-pointP = token $ Point <$> double <*> ($(symbol ",") *> double)
+pointP = token $ Point <$> double <*> (symbol "," *> double)
 
 -- | dot specification of a cubic spline (and an arrow head which is ignored here)
-data Spline = Spline {splineEnd :: Maybe (Point Double), splineStart :: Maybe (Point Double), splineP1 :: Point Double, splineTriples :: [(Point Double, Point Double, Point Double)]} deriving (Eq, Show, Generic)
+data Spline = Spline
+  { splineEnd :: Maybe (Point Double),
+    splineStart :: Maybe (Point Double),
+    splineP1 :: Point Double,
+    splineTriples :: [(Point Double, Point Double, Point Double)]
+  }
+  deriving (Eq, Show, Generic)
 
 -- |
 -- http://www.graphviz.org/docs/attr-types/splineType/
 splineP :: Parser Error Spline
 splineP =
   Spline
-    <$> optional ($(symbol "e,") *> pointP)
-    <*> optional ($(symbol "s") *> pointP)
+    <$> optional (symbol "e," *> pointP)
+    <*> optional (symbol "s" *> pointP)
     <*> pointP
     <*> some ((,,) <$> pointP <*> pointP <*> pointP)
 
@@ -195,19 +184,19 @@ splineP =
 rectP :: Parser Error (Rect Double)
 rectP = token $ do
   x <- double
-  _ <- $(symbol ",")
+  _ <- symbol ","
   y <- double
-  _ <- $(symbol ",")
+  _ <- symbol ","
   z <- double
-  _ <- $(symbol ",")
+  _ <- symbol ","
   w <- double
   pure $ Rect x z y w
 
 -- | true | false
 boolP :: Parser Error Bool
 boolP =
-  (True <$ $(symbol "true"))
-    <|> (False <$ $(symbol "false"))
+  (True <$ symbol "true")
+    <|> (False <$ symbol "false")
 
 -- | NonEmpty version of many
 nonEmptyP :: Parser e a -> Parser e () -> Parser e (NonEmpty a)

@@ -1,7 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultilineStrings #-}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 
 -- | Examples of conversion from dot ByteStrings
@@ -20,7 +20,6 @@ import Prelude hiding (replicate)
 -- >>> import DotParse
 -- >>> import Data.Proxy
 -- >>> :set -XOverloadedStrings
--- >>> import Data.String.Interpolate
 -- >>> import qualified Data.ByteString.Char8 as Char8
 -- >>> import Optics.Core
 -- >>> import Chart
@@ -34,58 +33,48 @@ import Prelude hiding (replicate)
 --
 -- >>> testDotParser (Proxy :: Proxy Graph) defaultDotConfig ex0
 ex0 :: ByteString
-ex0 =
-  [i|
-graph {}
-|]
+ex0 = "graph {}"
 
 -- |
 -- ![Example](other/ex1.svg)
 ex1 :: ByteString
 ex1 =
-  [i|
-digraph D {
+  """digraph D {
     A [shape=diamond]
     B [shape=box]
     C [shape=circle]
     A -> B [style=dashed, color=grey]
     A -> C [color="black:invis:black"]
     A -> D [penwidth=5, arrowhead=none]
-    }
-|]
+    }"""
 
 -- |
 -- ![Example](other/ex2.svg)
 ex2 :: ByteString
 ex2 =
-  [i|
-digraph D {
+  """digraph D {
 
     node [fontname="Arial"];
 
     node_A [shape=record    label="shape=record|{above|middle|below}|right"];
     node_B [shape=plaintext label="shape=plaintext|{curly|braces and|bars without}|effect"];
 
-}
-|]
+}"""
 
 -- |
 -- ![Example](other/ex3.svg)
 ex3 :: ByteString
 ex3 =
-  [i|
-digraph D {
+  """digraph D {
   A -> {B, C, D} -> {F}
-}
-|]
+}"""
 
 -- |
 --
 -- ![Example](other/ex4.svg)
 ex4 :: ByteString
 ex4 =
-  [i|
-digraph L {
+  """digraph L {
 
   node [shape=record fontname=Arial];
 
@@ -95,16 +84,14 @@ digraph L {
 
   a -> b -> c
 
-}
-|]
+}"""
 
 -- |
 --
 -- ![Example](other/ex5.svg)
 ex5 :: ByteString
 ex5 =
-  [i|
-digraph D {
+  """digraph D {
 
   label = "The foo, the bar and the baz";
   labelloc = "t"; // place the label at the top (b seems to be default)
@@ -114,16 +101,14 @@ digraph D {
   FOO -> {BAR, BAZ};
 
 
-}
-|]
+}"""
 
 -- |
 --
 -- ![Example](other/ex6.svg)
 ex6 :: ByteString
 ex6 =
-  [i|
-digraph D {
+  """digraph D {
 
   label = <The <font color='red'><b>foo</b></font>,<br/> the <font point-size='20'>bar</font> and<br/> the <i>baz</i>>;
   labelloc = "t"; // place the label at the top (b seems to be default)
@@ -132,16 +117,14 @@ digraph D {
 
   FOO -> {BAR, BAZ};
 
-}
-|]
+}"""
 
 -- |
 --
 -- ![Example](other/ex7.svg)
 ex7 :: ByteString
 ex7 =
-  [i|
-digraph R {
+  """digraph R {
 
   { rank=same rA sA tA }
   { rank=same uB vB wB }
@@ -154,16 +137,14 @@ digraph R {
    wB -> u;
    wB -> tA;
 
-}
-|]
+}"""
 
 -- |
 --
 -- ![Example](other/ex8.svg)
 ex8 :: ByteString
 ex8 =
-  [i|
-digraph Q {
+  """digraph Q {
 
   nd_1   [label = "Node 1"];
   nd_2   [label = "Node 2"];
@@ -185,16 +166,14 @@ digraph Q {
 
   }
 
-}
-|]
+}"""
 
 -- |
 --
 -- ![Example](other/ex9.svg)
 ex9 :: ByteString
 ex9 =
-  [i|
-digraph D {
+  """digraph D {
 
   subgraph cluster_p {
     label = "Parent";
@@ -220,16 +199,14 @@ digraph D {
       e;
     }
   }
-}
-|]
+}"""
 
 -- |
 --
 -- ![Example](other/ex10.svg)
 ex10 :: ByteString
 ex10 =
-  [i|
-digraph H {
+  """digraph H {
 
   aHtmlTable [
    shape=plaintext
@@ -243,15 +220,14 @@ digraph H {
 
   >];
 
-}|]
+}"""
 
 -- |
 --
 -- ![Example](other/ex11.svg)
 ex11 :: ByteString
 ex11 =
-  [i|
-digraph {
+  """digraph {
 
   tbl [
 
@@ -281,16 +257,14 @@ digraph {
 
     >];
 
-}
-|]
+}"""
 
 -- |
 --
 -- ![Example](other/ex12.svg)
 ex12 :: ByteString
 ex12 =
-  [i|
-digraph D {
+  """digraph D {
 
   node [shape=plaintext]
 
@@ -298,20 +272,18 @@ digraph D {
    label=<
      <table border="0" cellborder="1" cellspacing="0">
        <tr><td bgcolor="yellow">Foo</td></tr>
-       <tr><td bgcolor="lightblue"><font color="\#0000ff">Bar</font></td></tr>
-       <tr><td bgcolor="\#f0e3ff"><font color="\#ff1020">Baz</font></td></tr>
+       <tr><td bgcolor="lightblue"><font color="#0000ff">Bar</font></td></tr>
+       <tr><td bgcolor="#f0e3ff"><font color="#ff1020">Baz</font></td></tr>
      </table>>
   ];
-}
-|]
+}"""
 
 -- |
 --
 -- ![Example](other/ex13.svg)
 ex13 :: ByteString
 ex13 =
-  [i|
-digraph H {
+  """digraph H {
 
   aHtmlTable [
    shape=plaintext
@@ -324,16 +296,14 @@ digraph H {
 
   >];
 
-}
-|]
+}"""
 
 -- |
 --
 -- ![Example](other/ex14.svg)
 ex14 :: ByteString
 ex14 =
-  [i|
-digraph H {
+  """digraph H {
 
   parent [
    shape=plaintext
@@ -372,16 +342,14 @@ digraph H {
   parent:port_two   -> child_two;
   parent:port_three -> child_three;
 
-}
-|]
+}"""
 
 -- |
 --
 -- ![Example](other/ex15.svg)
 ex15 :: ByteString
 ex15 =
-  [i|
-digraph D {
+  """digraph D {
 
   node [shape=plaintext fontname="Sans serif" fontsize="8"];
 
@@ -434,8 +402,7 @@ digraph D {
   task_table       -> task_eat;
   task_cook        -> task_eat;
 
-}
-|]
+}"""
 
 -- | Test all the examples
 testAll :: IO ()

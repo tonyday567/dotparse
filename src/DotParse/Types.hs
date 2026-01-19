@@ -1,8 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
@@ -93,8 +91,8 @@ import Data.Proxy
 import Data.Text (Text)
 import Data.Text qualified as Text
 import Data.These
-import DotParse.FlatParse
-import FlatParse.Basic hiding (cut)
+import DotParse.Parser
+import DotParse.SplineParser
 import GHC.Generics
 import Optics.Core
 import System.Exit
@@ -104,9 +102,7 @@ import Prelude hiding (replicate)
 -- $setup
 -- >>> import DotParse
 -- >>> import qualified Data.Map as Map
--- >>> import qualified FlatParse.Basic as FP
 -- >>> import qualified Data.ByteString as BS
--- >>> import FlatParse.Basic (runParser, Result)
 -- >>> :set -XOverloadedStrings
 
 -- | printing options, for separators.
@@ -249,7 +245,7 @@ instance DotParse Strict where
   dotPrint _ MergeEdges = "strict"
   dotPrint _ NoMergeEdges = ""
 
-  dotParse = token $ withOption ($(keyword "strict")) (const $ pure MergeEdges) (pure NoMergeEdges)
+  dotParse = token $ withOption (keyword "strict") (const $ pure MergeEdges) (pure NoMergeEdges)
 
 -- | Default Strict is NoMergeEdges
 defStrict :: Last Strict -> Strict
@@ -265,8 +261,8 @@ instance DotParse Directed where
 
   dotParse =
     token $
-      (Directed <$ $(keyword "digraph"))
-        <|> (UnDirected <$ $(keyword "graph"))
+      (Directed <$ keyword "digraph")
+        <|> (UnDirected <$ keyword "graph")
 
 -- | Default Directed is Directed
 defDirected :: Last Directed -> Directed
@@ -331,7 +327,7 @@ instance DotParse ID where
   -- order matters
   dotParse =
     (ID <$> ident)
-      <|> (IDInt <$> (signed int `notFollowedBy` $(char '.')))
+      <|> (IDInt <$> (signed int `notFollowedBy` char '.'))
       <|> (IDDouble <$> signed double)
       <|> (IDQuoted . strToUtf8 <$> quoted)
       <|> (IDHtml . strToUtf8 <$> htmlLike)
@@ -355,7 +351,7 @@ instance DotParse (ID, ID) where
   dotParse = token $
     do
       x0 <- token dotParse
-      _ <- token $(symbol "=")
+      _ <- symbol "="
       x1 <- dotParse
       pure (x0, x1)
 
@@ -390,21 +386,17 @@ instance DotParse Compass where
 
   dotParse =
     token
-      $( switch
-           [|
-             case _ of
-               "n" -> pure CompassN
-               "ne" -> pure CompassNE
-               "e" -> pure CompassE
-               "se" -> pure CompassSE
-               "s" -> pure CompassS
-               "sw" -> pure CompassSW
-               "w" -> pure CompassW
-               "nw" -> pure CompassNW
-               "c" -> pure CompassC
-               "_" -> pure Compass_
-             |]
-       )
+      ( (string "n" >> pure CompassN)
+          <|> (string "ne" >> pure CompassNE)
+          <|> (string "e" >> pure CompassE)
+          <|> (string "se" >> pure CompassSE)
+          <|> (string "s" >> pure CompassS)
+          <|> (string "sw" >> pure CompassSW)
+          <|> (string "w" >> pure CompassW)
+          <|> (string "nw" >> pure CompassNW)
+          <|> (string "c" >> pure CompassC)
+          <|> (string "_" >> pure Compass_)
+      )
 
 -- | Port instructions which are optionally associated with an identifier
 newtype Port = Port {portID :: These ID Compass} deriving (Eq, Show, Generic)
@@ -416,9 +408,9 @@ instance DotParse Port where
 
   dotParse =
     token $
-      ((\x0 x1 -> Port (These x0 x1)) <$> ($(symbol ":") *> dotParse) <*> ($(symbol ":") *> dotParse))
-        <|> (Port . This <$> ($(symbol ":") *> dotParse))
-        <|> (Port . That <$> ($(symbol ":") *> dotParse))
+      ((\x0 x1 -> Port (These x0 x1)) <$> (symbol ":" *> dotParse) <*> (symbol ":" *> dotParse))
+        <|> (Port . This <$> (symbol ":" *> dotParse))
+        <|> (Port . That <$> (symbol ":" *> dotParse))
 
 -- | A top-level attribute
 --
@@ -440,9 +432,9 @@ instance DotParse AttributeType where
 
   dotParse =
     token
-      (GraphType <$ $(keyword "graph"))
-      <|> (NodeType <$ $(keyword "node"))
-      <|> (EdgeType <$ $(keyword "edge"))
+      (GraphType <$ keyword "graph")
+      <|> (NodeType <$ keyword "node")
+      <|> (EdgeType <$ keyword "edge")
 
 -- | Top-level attribute statement
 --
@@ -501,13 +493,9 @@ instance DotParse EdgeOp where
 
   dotParse =
     token
-      $( switch
-           [|
-             case _ of
-               "->" -> pure EdgeDirected
-               "--" -> pure EdgeUndirected
-             |]
-       )
+      ( (string "->" >> pure EdgeDirected)
+          <|> (string "--" >> pure EdgeUndirected)
+      )
 
 -- | generate an EdgeOp given the type of graph.
 fromDirected :: Directed -> EdgeOp
@@ -573,7 +561,7 @@ instance DotParse SubGraphStatement where
         <> (: []) (wrapCurlyPrint (intercalate (cfg ^. #subGraphSep) $ dotPrint cfg <$> xs))
 
   dotParse = token $ do
-    x <- optional ($(keyword "subgraph") *> dotParse)
+    x <- optional (keyword "subgraph" *> dotParse)
     pure (SubGraphStatement x) <*> wrapCurlyP (many (optional sepP *> dotParse))
 
 -- | add a graphviz statement to a 'Graph'
