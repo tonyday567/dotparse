@@ -9,6 +9,7 @@ import Algebra.Graph qualified as G
 import Data.Bifunctor
 import Data.Map.Strict qualified as Map
 import Data.Monoid
+import Data.String.Interpolate
 import Data.Text (Text, pack)
 import DotParse
 import FlatParse.Basic

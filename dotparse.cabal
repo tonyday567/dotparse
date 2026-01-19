@@ -65,6 +65,7 @@ common ghc2024-stanza
 
 library
   default-language: GHC2024
+  default-extensions: QuasiQuotes
   hs-source-dirs: src
   build-depends:
     algebraic-graphs >=0.6 && <0.9,
