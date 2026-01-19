@@ -13,6 +13,7 @@ allow-newer:
   , indexed-traversable-instances:base
   , tdigest:base
   , template-haskell:base
-  , algebraic-graphs:base
-  , *:containers
+  , optics-core:containers
+  , indexed-traversable:containers
+-- micolens-th
   , *:template-haskell
