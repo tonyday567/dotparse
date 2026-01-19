@@ -8,3 +8,12 @@ tests: true
 allow-newer:
   , tree-diff:base
   , tree-diff:time
+  , these:base
+  , indexed-traversable:base
+  , indexed-traversable-instances:base
+  , tdigest:base
+  , template-haskell:base
+  , optics-core:containers
+  , indexed-traversable:containers
+-- micolens-th
+  , *:template-haskell
