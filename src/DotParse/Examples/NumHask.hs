@@ -12,7 +12,6 @@ import Data.Monoid
 import Data.String.Interpolate
 import Data.Text (Text, pack)
 import DotParse
-import FlatParse.Basic
 import Optics.Core
 import Prelude hiding (replicate)
 

@@ -1,8 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
@@ -75,6 +74,9 @@ module DotParse.Types
     toStatements,
     toDotGraph,
     toDotGraphWith,
+
+    -- * Re-exported parser utilities
+    strToUtf8,
   )
 where
 
@@ -91,10 +93,13 @@ import Data.Maybe
 import Data.Monoid
 import Data.Proxy
 import Data.Text (Text)
+import Data.Text.Encoding (decodeUtf8With, encodeUtf8)
+import Data.Text.Encoding.Error (lenientDecode)
+import Data.Text qualified as T
 import Data.Text qualified as Text
 import Data.These
-import DotParse.FlatParse
-import FlatParse.Basic hiding (cut)
+import DotParse.Parser
+import Circuit.Parser
 import GHC.Generics
 import Optics.Core
 import System.Exit
@@ -125,25 +130,30 @@ defaultDotConfig = DotConfig " " "\n    " ";" ";"
 -- | A parser & printer class for a graphviz graph and components of its dot language
 class DotParse a where
   dotPrint :: DotConfig -> a -> ByteString
-  dotParse :: Parser Error a
+  dotParse :: Parser Text Char a
 
 -- | dotParse and then dotPrint:
 --
 -- - pretty printing error on failure.
 --
 -- - This is not an exact parser/printer, so the test re-parses the dotPrint, which should be idempotent
-testDotParser :: forall a. (DotParse a) => Proxy a -> DotConfig -> ByteString -> IO ()
+testDotParser :: forall a. (DotParse a, Show a, Eq a) => Proxy a -> DotConfig -> ByteString -> IO ()
 testDotParser _ cfg b =
-  case runParser dotParse b :: Result Error a of
-    Err e -> B.putStrLn $ prettyError b e
-    OK a left -> do
-      when (left /= "") (B.putStrLn $ "parsed with leftovers: " <> left)
-      case runParser dotParse (dotPrint cfg a) :: Result Error a of
-        Err e -> B.putStrLn $ "round trip error: " <> prettyError (dotPrint cfg a) e
-        Fail -> B.putStrLn "uncaught round trip parse error"
-        OK _ left' -> do
-          when (left' /= "") (B.putStrLn $ "round trip parse with left overs" <> left)
-    Fail -> B.putStrLn "uncaught parse error"
+  case runParser dotParse (decodeUtf8With lenientDecode b) of
+    That _ -> B.putStrLn "uncaught parse error"
+    These a left -> do
+      when (not (T.null left)) (B.putStrLn $ "parsed with leftovers: " <> encodeUtf8 left)
+      checkRoundTrip a
+    This a -> checkRoundTrip a
+  where
+    checkRoundTrip :: a -> IO ()
+    checkRoundTrip a = case runParser dotParse (decodeUtf8With lenientDecode (dotPrint cfg a)) of
+      That _  -> B.putStrLn "uncaught round trip parse error"
+      These a' left' -> do
+        when (not (T.null left')) (B.putStrLn $ "round trip parse with leftovers: " <> encodeUtf8 left')
+        print (a' == a)
+      This a' -> print (a' == a)
+      This a' -> print (a' == a)
 
 -- | run a dotParse erroring on leftovers, Fail or Err
 runDotParser :: (DotParse a) => ByteString -> a
@@ -249,7 +259,7 @@ instance DotParse Strict where
   dotPrint _ MergeEdges = "strict"
   dotPrint _ NoMergeEdges = ""
 
-  dotParse = token $ withOption ($(keyword "strict")) (const $ pure MergeEdges) (pure NoMergeEdges)
+  dotParse = token $ withOption (keyword "strict") (const $ pure MergeEdges) (pure NoMergeEdges)
 
 -- | Default Strict is NoMergeEdges
 defStrict :: Last Strict -> Strict
@@ -265,8 +275,8 @@ instance DotParse Directed where
 
   dotParse =
     token $
-      (Directed <$ $(keyword "digraph"))
-        <|> (UnDirected <$ $(keyword "graph"))
+      (Directed <$ keyword "digraph")
+        <|> (UnDirected <$ keyword "graph")
 
 -- | Default Directed is Directed
 defDirected :: Last Directed -> Directed
@@ -331,7 +341,7 @@ instance DotParse ID where
   -- order matters
   dotParse =
     (ID <$> ident)
-      <|> (IDInt <$> (signed int `notFollowedBy` $(char '.')))
+      <|> (IDInt <$> (signed int <* notFollowedBy (char' '.')))
       <|> (IDDouble <$> signed double)
       <|> (IDQuoted . strToUtf8 <$> quoted)
       <|> (IDHtml . strToUtf8 <$> htmlLike)
@@ -355,7 +365,7 @@ instance DotParse (ID, ID) where
   dotParse = token $
     do
       x0 <- token dotParse
-      _ <- token $(symbol "=")
+      _ <- token (symbol "=")
       x1 <- dotParse
       pure (x0, x1)
 
@@ -390,21 +400,16 @@ instance DotParse Compass where
 
   dotParse =
     token
-      $( switch
-           [|
-             case _ of
-               "n" -> pure CompassN
-               "ne" -> pure CompassNE
-               "e" -> pure CompassE
-               "se" -> pure CompassSE
-               "s" -> pure CompassS
-               "sw" -> pure CompassSW
-               "w" -> pure CompassW
-               "nw" -> pure CompassNW
-               "c" -> pure CompassC
-               "_" -> pure Compass_
-             |]
-       )
+      (CompassN <$ string "n"
+        <|> CompassNE <$ string "ne"
+        <|> CompassE <$ string "e"
+        <|> CompassSE <$ string "se"
+        <|> CompassS <$ string "s"
+        <|> CompassSW <$ string "sw"
+        <|> CompassW <$ string "w"
+        <|> CompassNW <$ string "nw"
+        <|> CompassC <$ string "c"
+        <|> Compass_ <$ string "_")
 
 -- | Port instructions which are optionally associated with an identifier
 newtype Port = Port {portID :: These ID Compass} deriving (Eq, Show, Generic)
@@ -416,9 +421,9 @@ instance DotParse Port where
 
   dotParse =
     token $
-      ((\x0 x1 -> Port (These x0 x1)) <$> ($(symbol ":") *> dotParse) <*> ($(symbol ":") *> dotParse))
-        <|> (Port . This <$> ($(symbol ":") *> dotParse))
-        <|> (Port . That <$> ($(symbol ":") *> dotParse))
+      ((\x0 x1 -> Port (These x0 x1)) <$> (symbol ":" *> dotParse) <*> (symbol ":" *> dotParse))
+        <|> (Port . This <$> (symbol ":" *> dotParse))
+        <|> (Port . That <$> (symbol ":" *> dotParse))
 
 -- | A top-level attribute
 --
@@ -440,9 +445,9 @@ instance DotParse AttributeType where
 
   dotParse =
     token
-      (GraphType <$ $(keyword "graph"))
-      <|> (NodeType <$ $(keyword "node"))
-      <|> (EdgeType <$ $(keyword "edge"))
+      (GraphType <$ keyword "graph")
+      <|> (NodeType <$ keyword "node")
+      <|> (EdgeType <$ keyword "edge")
 
 -- | Top-level attribute statement
 --
@@ -501,13 +506,8 @@ instance DotParse EdgeOp where
 
   dotParse =
     token
-      $( switch
-           [|
-             case _ of
-               "->" -> pure EdgeDirected
-               "--" -> pure EdgeUndirected
-             |]
-       )
+      (EdgeDirected <$ string "->"
+        <|> EdgeUndirected <$ string "--")
 
 -- | generate an EdgeOp given the type of graph.
 fromDirected :: Directed -> EdgeOp
@@ -573,7 +573,7 @@ instance DotParse SubGraphStatement where
         <> (: []) (wrapCurlyPrint (intercalate (cfg ^. #subGraphSep) $ dotPrint cfg <$> xs))
 
   dotParse = token $ do
-    x <- optional ($(keyword "subgraph") *> dotParse)
+    x <- optional (keyword "subgraph" *> dotParse)
     pure (SubGraphStatement x) <*> wrapCurlyP (many (optional sepP *> dotParse))
 
 -- | add a graphviz statement to a 'Graph'

@@ -48,6 +48,9 @@ module DotParse
     toStatements,
     toDotGraph,
     toDotGraphWith,
+
+    -- * Parser utilities
+    strToUtf8,
   )
 where
 
