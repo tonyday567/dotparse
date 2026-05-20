@@ -65,7 +65,6 @@ common ghc2024-stanza
 
 library
   default-language: GHC2024
-  default-extensions: QuasiQuotes
   hs-source-dirs: src
   build-depends:
     algebraic-graphs >=0.6 && <0.9,
@@ -78,7 +77,7 @@ library
     numhask-space >=0.10 && <0.14,
     optics-core >=0.4 && <0.5,
     process-extras >=0.7.4 && <0.8,
-    string-interpolate >=0.3 && <0.4,
+    
     template-haskell >=2.20 && <2.25,
     text >=1.2 && <2.2,
     these >=1.1 && <1.3,

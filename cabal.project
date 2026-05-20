@@ -2,3 +2,8 @@ packages:
   dotparse.cabal
   /Users/tonyday567/haskell/circuits-parser/circuits-parser.cabal
   /Users/tonyday567/haskell/circuits/circuits.cabal
+
+write-ghc-environment-files: always
+
+allow-newer:
+  tdigest:base

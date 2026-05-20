@@ -1,6 +1,5 @@
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes #-}
 
 -- | Example of Dot graph construction for the <https://hackage.haskell.org/package/numhask NumHask> class heirarchy.
 module DotParse.Examples.NumHask where
@@ -9,7 +8,6 @@ import Algebra.Graph qualified as G
 import Data.Bifunctor
 import Data.Map.Strict qualified as Map
 import Data.Monoid
-import Data.String.Interpolate
 import Data.Text (Text, pack)
 import DotParse
 import Optics.Core
@@ -202,7 +200,7 @@ graphNHG =
 -- | Convert a node ID to a label for chart-svg charts
 -- Doing this directly in dot doesn't quite work because the engines get the width of the link wrong.
 toLinkNH :: ID -> Text
-toLinkNH id_ = [i|<a href="https://hackage.haskell.org/package/numhask/docs/#{m}.html\#t:#{t}">#{t}</a>|]
+toLinkNH id_ = "<a href=\"https://hackage.haskell.org/package/numhask/docs/" <> m <> ".html#t:" <> t <> "\">" <> t <> "</a>"
   where
     t = pack (label id_)
     m = Map.fromList (first (pack . show) <$> classesModule) Map.! t

@@ -1,6 +1,5 @@
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes #-}
 
 -- | Example of Dot graph construction for the <https://hackage.haskell.org/package/chart-svg chart-svg> class heirarchy.
 module DotParse.Examples.AST where
@@ -13,7 +12,6 @@ import Data.List.NonEmpty hiding (filter, head, length, map, zip, zipWith, (!!))
 import Data.Map.Strict qualified as Map
 import Data.Maybe
 import Data.Monoid
-import Data.String.Interpolate
 import Data.These
 import DotParse.Types
 import GHC.Generics
@@ -95,7 +93,7 @@ toStatementsRecord d g =
 -- | Convert a node ID to a label for chart-svg charts
 -- Doing this directly in dot doesn't quite work because the engines get the width of the link wrong.
 toURL :: ByteString -> Maybe ByteString
-toURL name = fmap (\i' -> [i|https://hackage.haskell.org/package/#{view #itemPackage i'}/docs/#{view #itemModule i'}.html\#t:#{view #item i'}|]) item
+toURL name = fmap (\i' -> "https://hackage.haskell.org/package/" <> view #itemPackage i' <> "/docs/" <> view #itemModule i' <> ".html#t:" <> view #item i') item
   where
     item = List.find ((== name) . view #item) itemModules
 
