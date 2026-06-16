@@ -82,6 +82,7 @@ where
 
 import Algebra.Graph qualified as G
 import Chart
+import Circuit.Parser
 import Control.Monad
 import Data.Bool
 import Data.ByteString hiding (any, empty, filter, head, length, map, zip, zipWith)
@@ -93,13 +94,12 @@ import Data.Maybe
 import Data.Monoid
 import Data.Proxy
 import Data.Text (Text)
-import Data.Text.Encoding (decodeUtf8With, encodeUtf8)
-import Data.Text.Encoding.Error (lenientDecode)
 import Data.Text qualified as T
 import Data.Text qualified as Text
+import Data.Text.Encoding (decodeUtf8With, encodeUtf8)
+import Data.Text.Encoding.Error (lenientDecode)
 import Data.These
 import DotParse.Parser
-import Circuit.Parser
 import GHC.Generics
 import Optics.Core
 import System.Exit
@@ -148,7 +148,7 @@ testDotParser _ cfg b =
   where
     checkRoundTrip :: a -> IO ()
     checkRoundTrip a = case runParser dotParse (decodeUtf8With lenientDecode (dotPrint cfg a)) of
-      That _  -> B.putStrLn "uncaught round trip parse error"
+      That _ -> B.putStrLn "uncaught round trip parse error"
       These a' left' -> do
         unless (T.null left') (B.putStrLn $ "round trip parse with leftovers: " <> encodeUtf8 left')
         print (a' == a)
@@ -400,16 +400,27 @@ instance DotParse Compass where
 
   dotParse =
     token
-      (CompassN <$ string "n"
-        <|> CompassNE <$ string "ne"
-        <|> CompassE <$ string "e"
-        <|> CompassSE <$ string "se"
-        <|> CompassS <$ string "s"
-        <|> CompassSW <$ string "sw"
-        <|> CompassW <$ string "w"
-        <|> CompassNW <$ string "nw"
-        <|> CompassC <$ string "c"
-        <|> Compass_ <$ string "_")
+      ( CompassN
+          <$ string "n"
+            <|> CompassNE
+          <$ string "ne"
+            <|> CompassE
+          <$ string "e"
+            <|> CompassSE
+          <$ string "se"
+            <|> CompassS
+          <$ string "s"
+            <|> CompassSW
+          <$ string "sw"
+            <|> CompassW
+          <$ string "w"
+            <|> CompassNW
+          <$ string "nw"
+            <|> CompassC
+          <$ string "c"
+            <|> Compass_
+          <$ string "_"
+      )
 
 -- | Port instructions which are optionally associated with an identifier
 newtype Port = Port {portID :: These ID Compass} deriving (Eq, Show, Generic)
@@ -506,8 +517,11 @@ instance DotParse EdgeOp where
 
   dotParse =
     token
-      (EdgeDirected <$ string "->"
-        <|> EdgeUndirected <$ string "--")
+      ( EdgeDirected
+          <$ string "->"
+            <|> EdgeUndirected
+          <$ string "--"
+      )
 
 -- | generate an EdgeOp given the type of graph.
 fromDirected :: Directed -> EdgeOp

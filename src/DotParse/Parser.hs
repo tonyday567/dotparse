@@ -68,11 +68,11 @@ import Data.ByteString hiding (any, empty, filter, head, length, map, null, reve
 import Data.ByteString.Char8 qualified as B
 import Data.Char
 import Data.Functor
+import Data.List.NonEmpty hiding (head, map, reverse)
 import Data.Text (Text)
+import Data.Text qualified as T
 import Data.Text.Encoding (decodeUtf8With)
 import Data.Text.Encoding.Error (lenientDecode)
-import Data.Text qualified as T
-import Data.List.NonEmpty hiding (head, map, reverse)
 import GHC.Generics
 import NumHask.Space
 import Prelude hiding (replicate)
@@ -82,11 +82,11 @@ import Prelude hiding (replicate)
 ----------------------------------------------------------------------
 
 isWhitespace :: Char -> Bool
-isWhitespace ' '  = True
+isWhitespace ' ' = True
 isWhitespace '\t' = True
 isWhitespace '\n' = True
 isWhitespace '\r' = True
-isWhitespace _    = False
+isWhitespace _ = False
 
 -- | Consume whitespace + comments.
 ws :: Parser Text Char ()
@@ -110,7 +110,7 @@ multilineComment = char '/' *> char '*' *> go (1 :: Int)
       (string "*/" *> go (n - 1))
         <|> (string "/*" *> go (n + 1))
         <|> (anyToken >> go n)
-        <|> pure ()  -- EOF inside comment
+        <|> pure () -- EOF inside comment
 
 -- | Parse a HTML-Like string by counting the angle brackets
 htmlLike :: Parser Text Char String
@@ -217,8 +217,8 @@ utf8ToStr = fmap (toEnum . fromEnum) . B.unpack
 notFollowedBy :: Parser Text Char a -> Parser Text Char ()
 notFollowedBy p = Parser $ Lift $ \s ->
   case runParser p s of
-    That _    -> These () s
-    _         -> That s
+    That _ -> These () s
+    _ -> That s
 
 ----------------------------------------------------------------------
 -- Runner helpers (from FlatParse)
@@ -227,16 +227,16 @@ notFollowedBy p = Parser $ Lift $ \s ->
 testParser :: (Show a) => Parser Text Char a -> ByteString -> IO ()
 testParser p b =
   case runParser p (decodeUtf8With lenientDecode b) of
-    That _  -> B.putStrLn "uncaught parse error"
-    This a  -> print a
+    That _ -> B.putStrLn "uncaught parse error"
+    This a -> print a
     These a _ -> print a
 
 runParser_ :: Parser Text Char a -> ByteString -> a
 runParser_ p b = case runParser p (decodeUtf8With lenientDecode b) of
   These r s | T.null s -> r
   These _ x -> error $ "leftovers: " <> T.unpack x
-  This r    -> r
-  That _    -> error "parse error"
+  This r -> r
+  That _ -> error "parse error"
 
 ----------------------------------------------------------------------
 -- Numeric parsers (from FlatParse)
