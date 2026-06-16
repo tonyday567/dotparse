@@ -1,7 +1,18 @@
 packages:
   dotparse.cabal
-  /Users/tonyday567/haskell/circuits-parser/circuits-parser.cabal
-  /Users/tonyday567/haskell/circuits/circuits.cabal
+
+source-repository-package
+  type: git
+  location: https://github.com/tonyday567/circuits-parser.git
+  branch: main
+
+source-repository-package
+  type: git
+  location: https://github.com/tonyday567/circuits.git
+  branch: feat/circuits-0.2-cleanup
+
+constraints:
+  circuits >= 0.2
 
 write-ghc-environment-files: always
 
