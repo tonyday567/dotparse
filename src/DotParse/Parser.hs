@@ -1,6 +1,4 @@
 {-# LANGUAGE BlockArguments #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-# OPTIONS_GHC -Wno-x-partial #-}
@@ -64,6 +62,7 @@ where
 
 import Circuit (Circuit (Lift))
 import Circuit.Parser
+import Control.Monad (void)
 import Data.Bool
 import Data.ByteString hiding (any, empty, filter, head, length, map, null, reverse, zip, zipWith)
 import Data.ByteString.Char8 qualified as B
@@ -145,11 +144,11 @@ identChar = satisfy isValidChar
 
 -- | Parse a non-keyword string.
 symbol :: String -> Parser Text Char ()
-symbol str = token (() <$ string str)
+symbol str = token (void (string str))
 
 -- | Parse a keyword string.
 keyword :: String -> Parser Text Char ()
-keyword str = token (() <$ string str)
+keyword str = token (void (string str))
 
 -- | Parse a keyword string, throw precise error on failure.
 keyword' :: String -> Parser Text Char ()
@@ -172,7 +171,7 @@ ident' = ident
 
 -- | Parse a single character (convenience alias).
 char' :: Char -> Parser Text Char ()
-char' c = () <$ char c
+char' c = void (char c)
 
 -- | Convenience: match a ByteString literal (byte-wise, matching IsString ByteString encoding)
 
@@ -210,10 +209,10 @@ cut' p _ = p
 ----------------------------------------------------------------------
 
 strToUtf8 :: String -> ByteString
-strToUtf8 = B.pack . map (toEnum . fromEnum)
+strToUtf8 = B.pack . fmap (toEnum . fromEnum)
 
 utf8ToStr :: ByteString -> String
-utf8ToStr = map (toEnum . fromEnum) . B.unpack
+utf8ToStr = fmap (toEnum . fromEnum) . B.unpack
 
 notFollowedBy :: Parser Text Char a -> Parser Text Char ()
 notFollowedBy p = Parser $ Lift $ \s ->
@@ -291,8 +290,8 @@ unquoteQuote = do
 sepP :: Parser Text Char ()
 sepP =
   token
-    ( (() <$ string ";")
-        <|> (() <$ string ",")
+    ( void (string ";")
+        <|> void (string ",")
     )
 
 wrapSquareP :: Parser Text Char a -> Parser Text Char a

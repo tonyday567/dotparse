@@ -142,7 +142,7 @@ testDotParser _ cfg b =
   case runParser dotParse (decodeUtf8With lenientDecode b) of
     That _ -> B.putStrLn "uncaught parse error"
     These a left -> do
-      when (not (T.null left)) (B.putStrLn $ "parsed with leftovers: " <> encodeUtf8 left)
+      unless (T.null left) (B.putStrLn $ "parsed with leftovers: " <> encodeUtf8 left)
       checkRoundTrip a
     This a -> checkRoundTrip a
   where
@@ -150,7 +150,7 @@ testDotParser _ cfg b =
     checkRoundTrip a = case runParser dotParse (decodeUtf8With lenientDecode (dotPrint cfg a)) of
       That _  -> B.putStrLn "uncaught round trip parse error"
       These a' left' -> do
-        when (not (T.null left')) (B.putStrLn $ "round trip parse with leftovers: " <> encodeUtf8 left')
+        unless (T.null left') (B.putStrLn $ "round trip parse with leftovers: " <> encodeUtf8 left')
         print (a' == a)
       This a' -> print (a' == a)
       This a' -> print (a' == a)
