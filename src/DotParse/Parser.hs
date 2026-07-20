@@ -60,7 +60,7 @@ module DotParse.Parser
   )
 where
 
-import Circuit (Circuit (Lift))
+import Circuit (Loop (Lift))
 import Circuit.Parser
 import Control.Monad (void)
 import Data.Bool

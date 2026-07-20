@@ -71,7 +71,7 @@ library
     base >=4.19 && <5,
     bytestring >=0.11.3 && <0.13,
     chart-svg >=0.8 && <0.9,
-    containers >=0.6 && <0.7,
+    containers >=0.6 && <0.9,
     circuits-parser >=0.1 && <0.2,
     circuits >=0.2 && <0.3,
     numhask-space >=0.10 && <0.14,
