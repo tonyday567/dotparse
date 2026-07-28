@@ -82,7 +82,7 @@ where
 
 import Algebra.Graph qualified as G
 import Chart
-import Circuit.Parser
+import Circuit.Parser hiding (Parser)
 import Control.Monad
 import Data.Bool
 import Data.ByteString hiding (any, empty, filter, head, length, map, zip, zipWith)
@@ -139,7 +139,7 @@ class DotParse a where
 -- - This is not an exact parser/printer, so the test re-parses the dotPrint, which should be idempotent
 testDotParser :: forall a. (DotParse a, Show a, Eq a) => Proxy a -> DotConfig -> ByteString -> IO ()
 testDotParser _ cfg b =
-  case runParser dotParse (decodeUtf8With lenientDecode b) of
+  case runParserIdentity dotParse (decodeUtf8With lenientDecode b) of
     That _ -> B.putStrLn "uncaught parse error"
     These a left -> do
       unless (T.null left) (B.putStrLn $ "parsed with leftovers: " <> encodeUtf8 left)
@@ -147,7 +147,7 @@ testDotParser _ cfg b =
     This a -> checkRoundTrip a
   where
     checkRoundTrip :: a -> IO ()
-    checkRoundTrip a = case runParser dotParse (decodeUtf8With lenientDecode (dotPrint cfg a)) of
+    checkRoundTrip a = case runParserIdentity dotParse (decodeUtf8With lenientDecode (dotPrint cfg a)) of
       That _ -> B.putStrLn "uncaught round trip parse error"
       These a' left' -> do
         unless (T.null left') (B.putStrLn $ "round trip parse with leftovers: " <> encodeUtf8 left')

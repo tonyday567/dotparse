@@ -11,6 +11,9 @@ module DotParse.Parser
     Error (..),
     prettyError,
 
+    -- * Parser type
+    Parser,
+
     -- * Token parsers
     keyword,
     keyword',
@@ -61,13 +64,17 @@ module DotParse.Parser
 where
 
 import Circuit (Loop (Lift))
-import Circuit.Parser
+import Circuit.Parser hiding (Parser)
+import Circuit.Parser (runParserIdentity)
+import qualified Circuit.Parser as CP
+import Control.Arrow (Kleisli (..))
 import Control.Monad (void)
 import Data.Bool
 import Data.ByteString hiding (any, empty, filter, head, length, map, null, reverse, zip, zipWith)
 import Data.ByteString.Char8 qualified as B
 import Data.Char
 import Data.Functor
+import Data.Functor.Identity (Identity)
 import Data.List.NonEmpty hiding (head, map, reverse)
 import Data.Text (Text)
 import Data.Text qualified as T
@@ -76,6 +83,9 @@ import Data.Text.Encoding.Error (lenientDecode)
 import GHC.Generics
 import NumHask.Space
 import Prelude hiding (replicate)
+
+-- | Local alias for the pure 'Circuit.Parser.Parser'.
+type Parser f s a = CP.Parser Identity f s a
 
 ----------------------------------------------------------------------
 -- Whitespace & token helpers (from TH)
@@ -215,8 +225,8 @@ utf8ToStr :: ByteString -> String
 utf8ToStr = fmap (toEnum . fromEnum) . B.unpack
 
 notFollowedBy :: Parser Text Char a -> Parser Text Char ()
-notFollowedBy p = Parser $ Lift $ \s ->
-  case runParser p s of
+notFollowedBy p = CP.Parser $ Lift $ Kleisli $ \s ->
+  pure $ case runParserIdentity p s of
     That _ -> These () s
     _ -> That s
 
@@ -226,13 +236,13 @@ notFollowedBy p = Parser $ Lift $ \s ->
 
 testParser :: (Show a) => Parser Text Char a -> ByteString -> IO ()
 testParser p b =
-  case runParser p (decodeUtf8With lenientDecode b) of
+  case runParserIdentity p (decodeUtf8With lenientDecode b) of
     That _ -> B.putStrLn "uncaught parse error"
     This a -> print a
     These a _ -> print a
 
 runParser_ :: Parser Text Char a -> ByteString -> a
-runParser_ p b = case runParser p (decodeUtf8With lenientDecode b) of
+runParser_ p b = case runParserIdentity p (decodeUtf8With lenientDecode b) of
   These r s | T.null s -> r
   These _ x -> error $ "leftovers: " <> T.unpack x
   This r -> r

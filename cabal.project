@@ -2,9 +2,17 @@ packages:
   dotparse.cabal
   ../circuits/circuits.cabal
   ../circuits-parser/circuits-parser.cabal
+  ../chart-svg/chart-svg.cabal
+  ../markup-parse/markup-parse.cabal
+  ../numhask/numhask.cabal
+  ../numhask-space/numhask-space.cabal
+  ../numhask-diff/numhask-diff.cabal
+  ../harpie/harpie.cabal
+  ../harpie-numhask/harpie-numhask.cabal
+  ../process-stats/process-stats.cabal
 
 constraints:
-  circuits >= 0.2
+  circuits >= 0.3
 
 write-ghc-environment-files: always
 
