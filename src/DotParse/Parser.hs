@@ -63,11 +63,10 @@ module DotParse.Parser
   )
 where
 
-import Circuit (Loop (Lift))
+import Circuit (K (..), Step (..))
 import Circuit.Parser hiding (Parser)
 import Circuit.Parser (runParserIdentity)
 import qualified Circuit.Parser as CP
-import Control.Arrow (Kleisli (..))
 import Control.Monad (void)
 import Data.Bool
 import Data.ByteString hiding (any, empty, filter, head, length, map, null, reverse, zip, zipWith)
@@ -225,10 +224,13 @@ utf8ToStr :: ByteString -> String
 utf8ToStr = fmap (toEnum . fromEnum) . B.unpack
 
 notFollowedBy :: Parser Text Char a -> Parser Text Char ()
-notFollowedBy p = CP.Parser $ Lift $ Kleisli $ \s ->
-  pure $ case runParserIdentity p s of
-    That _ -> These () s
-    _ -> That s
+notFollowedBy p = CP.Parser $ Step $ K $ \(s, ()) ->
+  pure
+    ( s,
+      case runParserIdentity p s of
+        That _ -> These () s
+        _ -> That s
+    )
 
 ----------------------------------------------------------------------
 -- Runner helpers (from FlatParse)
